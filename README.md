@@ -12,7 +12,8 @@ mix deps.get
 ARTIFACTS_MMO_TOKEN=... ARTIFACTS_MMO_CHARACTER=... MCP_OPEN=1 mix run --no-halt
 ```
 
-- `http://localhost:5243/` — spectator page, no credential.
+- `http://localhost:5243/` — character watch, no credential.
+- `http://localhost:5243/world` — whole-world map with characters overlaid.
 - `http://localhost:5243/api/characters` — the state it polls.
 - `http://localhost:5243/mcp` — MCP endpoint, bearer-gated (see below).
 

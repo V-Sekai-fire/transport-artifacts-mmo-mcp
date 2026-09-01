@@ -36,6 +36,7 @@ defmodule ArtifactsMMOMCP.Application do
       {ArtifactsMMOMCP.Trace, []},
       {ArtifactsMMOMCP.Renew, []},
       {ArtifactsMMOMCP.Watch, []},
+      {ArtifactsMMOMCP.World, []},
       {Plug.Cowboy,
        scheme: :http, plug: ArtifactsMMOMCP.Router, options: [port: port, ip: {0, 0, 0, 0}]}
     ]

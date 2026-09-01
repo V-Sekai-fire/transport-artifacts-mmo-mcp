@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>World Map</title>
+<style>
+  :root {
+    --bg: #17130f; --panel: #211b16; --line: #372c23; --ink: #f0e6db;
+    --dim: #a1907f; --accent: #e8a33d;
+    --forest: #2d5a3d; --water: #2a4a6a; --mountain: #6a5744;
+    --underground: #3a2f28; --lava: #6a2f1a; --desert: #8a7654;
+    --interior: #4a3a2e; --spawn: #7a6b52; --empty: #2a221c;
+    --monster: #d4614f; --resource: #6f9f6a; --npc: #7f8fd0;
+    --workshop: #d19a4a; --bank: #c0a060; --exchange: #b070c0;
+    --tasks: #e8c96a; --raid: #ff5a3a; --player: #ffdf6a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 12px; background: var(--bg); color: var(--ink);
+    font: 12px/1.4 ui-monospace, "SF Mono", Menlo, monospace;
+    display: grid; grid-template-columns: 1fr 260px; gap: 12px; height: 100vh;
+  }
+  #main { display: flex; flex-direction: column; min-width: 0; }
+  header { display: flex; align-items: center; gap: 12px; padding: 0 4px 8px; flex-wrap: wrap; }
+  h1 { font-size: 14px; font-weight: 600; margin: 0; letter-spacing: .08em; text-transform: uppercase; }
+  .layers { display: flex; gap: 4px; }
+  .layers button {
+    background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 4px; padding: 4px 10px; cursor: pointer; font: inherit;
+  }
+  .layers button.active { border-color: var(--accent); color: var(--accent); }
+  .meta { color: var(--dim); margin-left: auto; }
+  #stage {
+    flex: 1; background: #0f0c09; border: 1px solid var(--line); border-radius: 6px;
+    overflow: hidden; position: relative; cursor: grab;
+  }
+  #stage.dragging { cursor: grabbing; }
+  svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; }
+  .tile { stroke: rgba(0,0,0,.35); stroke-width: .05; }
+  .marker { pointer-events: none; }
+  .content { font-size: 6px; text-anchor: middle; dominant-baseline: central; fill: rgba(0,0,0,.7); font-weight: 700; pointer-events: none; }
+  .player-halo { fill: var(--player); opacity: .35; }
+  .player-dot { fill: var(--player); stroke: #000; stroke-width: .12; }
+  .player-label { font-size: 5.5px; text-anchor: middle; fill: var(--ink); paint-order: stroke; stroke: #000; stroke-width: 1.2; stroke-linejoin: round; pointer-events: none; }
+  #side { display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+  .panel h2 { font-size: 11px; font-weight: 600; margin: 0 0 8px; color: var(--dim); letter-spacing: .08em; text-transform: uppercase; }
+  .legend { display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; align-items: center; }
+  .swatch { width: 12px; height: 12px; border-radius: 2px; border: 1px solid rgba(0,0,0,.4); }
+  .glyph { width: 12px; text-align: center; font-weight: 700; color: rgba(0,0,0,.7); background: var(--player); border-radius: 2px; }
+  #chars { overflow-y: auto; }
+  .row { padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 11px; }
+  .row:last-child { border-bottom: none; }
+  .row .name { font-weight: 600; }
+  .row .where { color: var(--dim); font-size: 10px; }
+  #tooltip {
+    position: absolute; pointer-events: none; background: rgba(15,12,9,.95);
+    border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px;
+    font-size: 11px; max-width: 220px; display: none; z-index: 10;
+  }
+</style>
+</head>
+<body>
+<div id="main">
+  <header>
+    <h1>World Map</h1> <a href="/" style="color:var(--accent);text-decoration:none;font-size:12px;letter-spacing:.06em">→ CHARACTERS</a>
+    <div class="layers" id="layers"></div>
+    <span class="meta" id="status">loading…</span>
+  </header>
+  <div id="stage">
+    <svg id="canvas" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
+    <div id="tooltip"></div>
+  </div>
+</div>
+<aside id="side">
+  <div class="panel">
+    <h2>Terrain</h2>
+    <div class="legend" id="terrain-legend"></div>
+  </div>
+  <div class="panel">
+    <h2>Content</h2>
+    <div class="legend" id="content-legend"></div>
+  </div>
+  <div class="panel" id="chars-panel">
+    <h2>Characters</h2>
+    <div id="chars"></div>
+  </div>
+</aside>
+
+<script>
+const TERRAIN = [
+  ["forest", "var(--forest)", "Forest"],
+  ["water", "var(--water)", "Water / lake / sea"],
+  ["mountain", "var(--mountain)", "Mountain / mine"],
+  ["desertisland", "var(--desert)", "Desert island"],
+  ["underground", "var(--underground)", "Underground"],
+  ["lavaunderground", "var(--lava)", "Lava underground"],
+  ["interior", "var(--interior)", "Interior"],
+  ["spawn", "var(--spawn)", "Spawn"],
+  ["empty", "var(--empty)", "Empty"],
+];
+const CONTENT = [
+  ["M", "monster", "var(--monster)"],
+  ["R", "resource", "var(--resource)"],
+  ["N", "npc", "var(--npc)"],
+  ["W", "workshop", "var(--workshop)"],
+  ["B", "bank", "var(--bank)"],
+  ["X", "grand_exchange", "var(--exchange)"],
+  ["T", "tasks_master", "var(--tasks)"],
+  ["!", "raid", "var(--raid)"],
+];
+const CONTENT_GLYPH = Object.fromEntries(CONTENT.map(([g, k]) => [k, g]));
+const CONTENT_COLOR = Object.fromEntries(CONTENT.map(([, k, c]) => [k, c]));
+
+function terrainColor(tile) {
+  const fam = (tile.family || "").toLowerCase();
+  if (!fam || fam === "empty") return "var(--empty)";
+  for (const [prefix, color] of TERRAIN) {
+    if (fam === prefix || fam.startsWith(prefix + "_") || fam.startsWith(prefix)) return color;
+  }
+  if (fam.includes("lake") || fam.includes("sea") || fam.includes("coastline")) return "var(--water)";
+  if (fam.includes("mine")) return "var(--mountain)";
+  if (fam.includes("house") || fam.includes("village")) return "var(--interior)";
+  return "var(--forest)";
+}
+
+function renderLegends() {
+  document.getElementById("terrain-legend").innerHTML = TERRAIN.map(
+    ([, color, label]) => `<div class="swatch" style="background:${color}"></div><div>${label}</div>`
+  ).join("");
+  document.getElementById("content-legend").innerHTML = CONTENT.map(
+    ([glyph, key, color]) => `<div class="glyph" style="background:${color}">${glyph}</div><div>${key.replace(/_/g, " ")}</div>`
+  ).join("") + `<div class="glyph" style="background:var(--player)">●</div><div>character</div>`;
+}
+renderLegends();
+
+let world = { tiles: [], bounds: {}, characters: [] };
+let activeLayer = "overworld";
+let view = { scale: 1, tx: 0, ty: 0 };
+
+const svg = document.getElementById("canvas");
+const tooltip = document.getElementById("tooltip");
+
+function renderLayerButtons() {
+  const layers = Object.keys(world.bounds);
+  const html = layers.map(l => `<button data-layer="${l}" class="${l === activeLayer ? "active" : ""}">${l}</button>`).join("");
+  const el = document.getElementById("layers");
+  if (el.dataset.layers !== layers.join(",")) {
+    el.innerHTML = html;
+    el.dataset.layers = layers.join(",");
+    el.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+      activeLayer = b.dataset.layer;
+      view = { scale: 1, tx: 0, ty: 0 };
+      renderLayerButtons();
+      renderMap();
+    }));
+  } else {
+    el.querySelectorAll("button").forEach(b => b.classList.toggle("active", b.dataset.layer === activeLayer));
+  }
+}
+
+function renderMap() {
+  const bounds = world.bounds[activeLayer];
+  if (!bounds) { svg.innerHTML = ""; return; }
+  const w = bounds.max_x - bounds.min_x + 1;
+  const h = bounds.max_y - bounds.min_y + 1;
+  const pad = 2;
+  svg.setAttribute("viewBox", `${bounds.min_x - pad} ${bounds.min_y - pad} ${w + pad * 2} ${h + pad * 2}`);
+
+  const tiles = world.tiles.filter(t => t.layer === activeLayer);
+  const parts = tiles.map(t => {
+    const fill = terrainColor(t);
+    return `<rect class="tile" x="${t.x}" y="${t.y}" width="1" height="1" fill="${fill}" data-i="${t.map_id}"></rect>`;
+  });
+
+  for (const t of tiles) {
+    if (t.content_type && CONTENT_GLYPH[t.content_type]) {
+      parts.push(`<circle class="marker" cx="${t.x + 0.5}" cy="${t.y + 0.5}" r="0.32" fill="${CONTENT_COLOR[t.content_type]}"/>`);
+      parts.push(`<text class="content" x="${t.x + 0.5}" y="${t.y + 0.55}">${CONTENT_GLYPH[t.content_type]}</text>`);
+    } else if (t.transition) {
+      parts.push(`<path class="marker" d="M${t.x + 0.2},${t.y + 0.5} L${t.x + 0.8},${t.y + 0.5} M${t.x + 0.6},${t.y + 0.3} L${t.x + 0.8},${t.y + 0.5} L${t.x + 0.6},${t.y + 0.7}" stroke="${t.transition_gated ? '#d4614f' : '#f0e6db'}" stroke-width="0.08" fill="none"/>`);
+    }
+  }
+
+  for (const c of world.characters) {
+    if (c.layer !== activeLayer) continue;
+    parts.push(`<circle class="player-halo" cx="${c.x + 0.5}" cy="${c.y + 0.5}" r="0.9"/>`);
+    parts.push(`<circle class="player-dot" cx="${c.x + 0.5}" cy="${c.y + 0.5}" r="0.35"/>`);
+    parts.push(`<text class="player-label" x="${c.x + 0.5}" y="${c.y - 0.1}">${c.name}</text>`);
+  }
+
+  const gTransform = `translate(${view.tx} ${view.ty}) scale(${view.scale})`;
+  svg.innerHTML = `<g transform="${gTransform}">${parts.join("")}</g>`;
+
+  svg.querySelectorAll(".tile").forEach(r => {
+    r.addEventListener("mousemove", (ev) => {
+      const t = tiles.find(x => x.map_id == r.dataset.i);
+      if (!t) return;
+      tooltip.style.display = "block";
+      tooltip.style.left = (ev.clientX - svg.getBoundingClientRect().left + 12) + "px";
+      tooltip.style.top = (ev.clientY - svg.getBoundingClientRect().top + 12) + "px";
+      tooltip.innerHTML = `<b>${t.name}</b> (${t.x}, ${t.y})<br>${t.skin || ""}` +
+        (t.content_type ? `<br>${t.content_type}: <b>${t.content_code}</b>` : "") +
+        (t.transition ? `<br>→ ${t.transition}${t.transition_gated ? " (gated)" : ""}` : "");
+    });
+    r.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
+  });
+}
+
+function renderChars() {
+  document.getElementById("chars").innerHTML = world.characters.map(c => {
+    const cd = c.cooldown_expiration
+      ? Math.max(0, (new Date(c.cooldown_expiration) - Date.now()) / 1000).toFixed(1) + "s"
+      : "idle";
+    return `<div class="row">
+      <div class="name">${c.name} <span style="color:var(--dim)">lv ${c.level}</span></div>
+      <div class="where">${c.layer || "?"} (${c.x}, ${c.y}) · ${cd}</div>
+    </div>`;
+  }).join("");
+}
+
+// Pan and zoom with the mouse; the SVG transform is the source of truth.
+const stage = document.getElementById("stage");
+let dragging = null;
+stage.addEventListener("mousedown", (ev) => { dragging = { x: ev.clientX, y: ev.clientY, tx: view.tx, ty: view.ty }; stage.classList.add("dragging"); });
+window.addEventListener("mouseup", () => { dragging = null; stage.classList.remove("dragging"); });
+window.addEventListener("mousemove", (ev) => {
+  if (!dragging) return;
+  const rect = svg.getBoundingClientRect();
+  const vb = svg.viewBox.baseVal;
+  const px = vb.width / rect.width;
+  view.tx = dragging.tx + (ev.clientX - dragging.x) * px;
+  view.ty = dragging.ty + (ev.clientY - dragging.y) * px;
+  const g = svg.querySelector("g"); if (g) g.setAttribute("transform", `translate(${view.tx} ${view.ty}) scale(${view.scale})`);
+});
+stage.addEventListener("wheel", (ev) => {
+  ev.preventDefault();
+  const rect = svg.getBoundingClientRect();
+  const vb = svg.viewBox.baseVal;
+  const mx = vb.x + (ev.clientX - rect.left) / rect.width * vb.width;
+  const my = vb.y + (ev.clientY - rect.top) / rect.height * vb.height;
+  const factor = ev.deltaY < 0 ? 1.15 : 1 / 1.15;
+  const next = Math.max(0.6, Math.min(8, view.scale * factor));
+  view.tx = mx - (mx - view.tx) * (next / view.scale);
+  view.ty = my - (my - view.ty) * (next / view.scale);
+  view.scale = next;
+  const g = svg.querySelector("g"); if (g) g.setAttribute("transform", `translate(${view.tx} ${view.ty}) scale(${view.scale})`);
+}, { passive: false });
+
+async function poll() {
+  try {
+    const res = await fetch("/api/world", { cache: "no-store" });
+    world = await res.json();
+    if (!Object.keys(world.bounds).length) {
+      document.getElementById("status").textContent = world.error || "no tiles cached";
+      return;
+    }
+    if (!world.bounds[activeLayer]) activeLayer = Object.keys(world.bounds)[0];
+    const status = `${world.tiles.length} tiles · ${world.characters.length} characters · updated ${new Date(world.fetched_at).toLocaleTimeString()}`;
+    document.getElementById("status").textContent = status;
+    renderLayerButtons();
+    renderMap();
+    renderChars();
+  } catch (err) {
+    document.getElementById("status").textContent = "server unreachable";
+  }
+}
+
+poll();
+setInterval(poll, 2000);
+</script>
+</body>
+</html>

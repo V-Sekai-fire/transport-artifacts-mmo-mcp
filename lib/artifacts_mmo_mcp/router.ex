@@ -39,6 +39,19 @@ defmodule ArtifactsMMOMCP.Router do
     validate_origin: false
   ]
 
+  get "/world" do
+    conn
+    |> put_resp_content_type("text/html")
+    |> send_file(200, Application.app_dir(:artifacts_mmo_mcp, "priv/static/world.html"))
+  end
+
+  get "/api/world" do
+    conn
+    |> put_resp_header("cache-control", "no-store")
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, Jason.encode!(ArtifactsMMOMCP.World.snapshot()))
+  end
+
   get "/" do
     conn
     |> put_resp_content_type("text/html")
