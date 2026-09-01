@@ -748,11 +748,21 @@ function renderFeed() {
 
 // Pan and zoom.
 let dragging = null;
+let cullTimer = null;
+function scheduleCull() {
+  if (cullTimer) return;
+  cullTimer = requestAnimationFrame(() => { cullTimer = null; renderMap(); });
+}
+
 stage.addEventListener("mousedown", (ev) => {
   dragging = { x: ev.clientX, y: ev.clientY, tx: view.tx, ty: view.ty };
   stage.classList.add("dragging");
 });
-window.addEventListener("mouseup", () => { dragging = null; stage.classList.remove("dragging"); });
+window.addEventListener("mouseup", () => {
+  if (dragging) scheduleCull();
+  dragging = null;
+  stage.classList.remove("dragging");
+});
 window.addEventListener("mousemove", (ev) => {
   if (!dragging) return;
   view.tx = dragging.tx + (ev.clientX - dragging.x);
@@ -771,6 +781,7 @@ stage.addEventListener("wheel", (ev) => {
   view.scale = next;
   const g = svg.querySelector("#viewport");
   if (g) g.setAttribute("transform", `translate(${view.tx} ${view.ty}) scale(${view.scale})`);
+  scheduleCull();
 }, { passive: false });
 
 window.addEventListener("resize", () => { view.initialised = false; renderMap(); });
@@ -785,8 +796,9 @@ async function poll() {
       return;
     }
     if (!world.bounds[activeLayer]) activeLayer = Object.keys(world.bounds)[0];
+    const shown = mapMeta && mapMeta[activeLayer] ? visibleTiles(mapMeta[activeLayer]).length : 0;
     document.getElementById("status").textContent =
-      `${world.tiles.length} tiles · ${world.characters.length} live · ${new Date(world.fetched_at).toLocaleTimeString()}`;
+      `${shown} / ${world.tiles.length} tiles · ${world.characters.length} live · ${new Date(world.fetched_at).toLocaleTimeString()}`;
     renderLayerButtons();
     renderMap();
     renderHosted();
