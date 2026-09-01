@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: >-
+  If you use artifacts-mmo-mcp or the traces it produces, please
+  cite it using the metadata below.
+title: "artifacts-mmo-mcp"
+type: software
+version: "0.1.0"
+date-released: "2026-08-31"
+license: MIT
+repository-code: "https://github.com/weftspun/artifacts-mmo-mcp"
+url: "https://github.com/weftspun/artifacts-mmo-mcp"
+abstract: >-
+  MCP server that plays ArtifactsMMO and records two trace layers
+  for the taskweft HTN planner: the plan calls that chose each
+  action, and the game API requests that carried them out, joined
+  on run_id and step. Serves an unauthenticated spectator page
+  showing what every character is currently doing.
+authors:
+  - family-names: Lee
+    given-names: "K. S. Ernest (iFire)"
+    email: ernest.lee@chibifire.com

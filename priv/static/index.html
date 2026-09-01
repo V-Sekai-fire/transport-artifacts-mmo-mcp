@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Character Watch</title>
+<style>
+  :root {
+    --bg: #17130f; --card: #211b16; --line: #372c23; --ink: #f0e6db;
+    --dim: #a1907f; --accent: #e8a33d; --hp: #d4614f; --xp: #6f9f6a; --cd: #7f8fd0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; background: var(--bg); color: var(--ink);
+    font: 14px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: .08em; text-transform: uppercase; }
+  .meta { color: var(--dim); font-size: 12px; }
+  .meta.bad { color: var(--hp); }
+  #grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .card.busy { border-color: var(--accent); }
+  .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .name { font-size: 15px; font-weight: 600; }
+  .lvl { color: var(--dim); font-size: 12px; }
+  .doing { margin: 10px 0 4px; font-size: 13px; color: var(--accent); }
+  .doing.idle { color: var(--dim); }
+  .where { color: var(--dim); font-size: 12px; }
+  .bars { margin-top: 12px; display: grid; gap: 6px; }
+  .bar { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: center; font-size: 11px; color: var(--dim); }
+  .track { height: 6px; background: #0f0c09; border-radius: 3px; overflow: hidden; }
+  .fill { height: 100%; border-radius: 3px; transition: width .3s linear; }
+  .task { margin-top: 10px; font-size: 12px; color: var(--dim); }
+  .empty { color: var(--dim); padding: 40px 0; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Character Watch</h1>
+  <span class="meta" id="status">connecting…</span>
+</header>
+<div id="grid"></div>
+<div class="empty" id="empty" hidden>No characters reported yet.</div>
+
+<script>
+const grid = document.getElementById("grid");
+const statusEl = document.getElementById("status");
+const emptyEl = document.getElementById("empty");
+let latest = [];
+
+// The cooldown ticks down locally between polls so the page reads as live
+// rather than as a two-second staircase.
+function remaining(c) {
+  if (!c.cooldown_expiration) return 0;
+  return Math.max(0, (new Date(c.cooldown_expiration) - Date.now()) / 1000);
+}
+
+const VERB = {
+  move: "moving", fight: "fighting", gathering: "gathering", crafting: "crafting",
+  rest: "resting", recycling: "recycling", use: "using an item", equip: "equipping",
+  unequip: "unequipping", "task/new": "taking a task", "task/complete": "turning in a task",
+  "bank/deposit/item": "banking items", "bank/withdraw/item": "withdrawing items",
+  "npc/buy": "buying", "npc/sell": "selling", transition: "changing layer",
+};
+
+function doing(c) {
+  const left = remaining(c);
+  const last = c.last_action;
+  if (left > 0 && last) return `${VERB[last.action] || last.action} — ${left.toFixed(1)}s`;
+  if (left > 0) return `busy — ${left.toFixed(1)}s`;
+  if (last) return `idle after ${VERB[last.action] || last.action}`;
+  return "idle";
+}
+
+function bar(label, value, max, color) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  return `<div class="bar"><span>${label}</span>
+    <span class="track"><span class="fill" style="width:${pct}%;background:${color}"></span></span>
+    <span>${value}/${max}</span></div>`;
+}
+
+function render() {
+  if (!latest.length) { grid.innerHTML = ""; emptyEl.hidden = false; return; }
+  emptyEl.hidden = true;
+  grid.innerHTML = latest.map(c => {
+    const left = remaining(c);
+    const task = c.task
+      ? `<div class="task">task: ${c.task} (${c.task_type||"?"}) ${c.task_progress||0}/${c.task_total||0}</div>`
+      : "";
+    return `<div class="card ${left > 0 ? "busy" : ""}">
+      <div class="top"><span class="name">${c.name}</span><span class="lvl">lv ${c.level} · ${c.gold} gold</span></div>
+      <div class="doing ${left > 0 ? "" : "idle"}">${doing(c)}</div>
+      <div class="where">${c.layer||"?"} (${c.x}, ${c.y}) · bag ${c.inventory_used}/${c.inventory_max_items}</div>
+      <div class="bars">
+        ${bar("hp", c.hp, c.max_hp, "var(--hp)")}
+        ${bar("xp", c.xp, c.max_xp, "var(--xp)")}
+        ${bar("cd", Math.ceil(left), c.cooldown || 0, "var(--cd)")}
+      </div>
+      ${task}
+    </div>`;
+  }).join("");
+}
+
+async function poll() {
+  try {
+    const res = await fetch("/api/characters", { cache: "no-store" });
+    const data = await res.json();
+    latest = data.characters || [];
+    statusEl.className = data.error ? "meta bad" : "meta";
+    statusEl.textContent = data.error
+      ? data.error
+      : `${latest.length} character${latest.length === 1 ? "" : "s"} · updated ${new Date(data.fetched_at).toLocaleTimeString()}`;
+  } catch (err) {
+    statusEl.className = "meta bad";
+    statusEl.textContent = "server unreachable";
+  }
+  render();
+}
+
+poll();
+setInterval(poll, 2000);
+setInterval(render, 100);
+</script>
+</body>
+</html>
