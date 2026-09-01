@@ -11,7 +11,8 @@ defmodule ArtifactsMMOMCP.Bao do
   `ArtifactsMMOMCP.Renew` can replace either one without a restart.
 
   A bao that cannot be reached is not fatal: the environment stays
-  authoritative and the reason is logged.
+  authoritative and the reason is logged. `.internal` names resolve to AAAA
+  records only, so the connection is forced onto `:inet6`.
   """
 
   require Logger
@@ -68,7 +69,7 @@ defmodule ArtifactsMMOMCP.Bao do
             method: method,
             url: String.trim_trailing(addr, "/") <> path,
             headers: [{"x-vault-token", token}],
-            connect_options: [transport_opts: tls],
+            connect_options: [transport_opts: [:inet6 | tls]],
             receive_timeout: 10_000
           ] ++ if(body == nil, do: [], else: [json: body])
 
