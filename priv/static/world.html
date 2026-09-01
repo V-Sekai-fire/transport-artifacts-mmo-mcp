@@ -544,10 +544,22 @@ function tilePx(t, m) {
   return { px: (t.x - m.min_x) * m.tile_size, py: (t.y - m.min_y) * m.tile_size };
 }
 
+// Keep the focus point in the middle of the stage every render, so the
+// character stays centered as they move.
+function centerOnFocus(m) {
+  const rect = stage.getBoundingClientRect();
+  const f = focusPoint();
+  const cx = (f.x - m.min_x) + 0.5;
+  const cy = (f.y - m.min_y) + 0.5;
+  view.tx = rect.width  / 2 - cx * m.tile_size * view.scale;
+  view.ty = rect.height / 2 - cy * m.tile_size * view.scale;
+}
+
 function renderMap() {
   const m = mapMeta && mapMeta[activeLayer];
   if (!m) { svg.innerHTML = ""; return; }
   if (!view.initialised) initialFit(m);
+  if (!dragging) centerOnFocus(m);   // re-center every render unless the user is dragging
 
   const rect = stage.getBoundingClientRect();
   svg.setAttribute("viewBox", `0 0 ${rect.width} ${rect.height}`);
