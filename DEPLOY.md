@@ -94,3 +94,27 @@ flyctl certs check watch.chibifire.com -a artifacts-mmo-mcp
   open to the internet, and the deploy is wrong.
 - `/health` reports `bao.configured: true` with `cert_days_left` above ten. A
   falling number that never resets means renewal is not running.
+
+## Filling in the word-labels with generated art
+
+The world page renders a scribble sprite when Kenney has one and a word label
+when it does not. That's the honest fallback. The optional next step is
+generating a scribble-style sprite per missing code with Wan 2.1, and dropping
+it into `priv/static/wan/`; the page picks it up on the next load with no
+code change.
+
+```sh
+# what still needs art (no GPU needed)
+python scripts/gen_wan_sprites.py --world /path/to/world.json --list-missing
+
+# generate one thing to see the prompt work
+python scripts/gen_wan_sprites.py --world /path/to/world.json \
+  --codes monster:goblin
+
+# generate everything (GPU, ~2-3 min per image at 1024px on 8 GB)
+python scripts/gen_wan_sprites.py --world /path/to/world.json
+```
+
+The Wan checkpoint dir and any offload flags belong in the caller's env, not
+in this script. Local CUDA box, or rent a RunPod per CLAUDE.md's `runpod-batch-gpu`
+recipe.
