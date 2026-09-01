@@ -6,71 +6,124 @@
 <title>World Map</title>
 <style>
   :root {
-    --bg: #17130f; --panel: #211b16; --line: #372c23; --ink: #f0e6db;
-    --dim: #a1907f; --accent: #e8a33d;
-    --forest: #2d5a3d; --water: #2a4a6a; --mountain: #6a5744;
-    --underground: #3a2f28; --lava: #6a2f1a; --desert: #8a7654;
-    --interior: #4a3a2e; --spawn: #7a6b52; --empty: #2a221c;
-    --monster: #d4614f; --resource: #6f9f6a; --npc: #7f8fd0;
-    --workshop: #d19a4a; --bank: #c0a060; --exchange: #b070c0;
-    --tasks: #e8c96a; --raid: #ff5a3a; --player: #ffdf6a;
+    --bg: #f4efe4;
+    --panel: #ffffff;
+    --line: #d9cfbc;
+    --ink: #1c1a17;
+    --dim: #6b6459;
+    --accent: #b25a1a;
+
+    /* Terrain — pale hues, indexed by tile "name". Content markers on top must
+       stay visible over any of these, so the palette is desaturated. */
+    --t-forest:     #b7d8a6;
+    --t-enchanted:  #c8b8e0;
+    --t-forge:      #c9a97a;
+    --t-sea:        #a9c7dd;
+    --t-lake:       #cbe1ed;
+    --t-mountain:   #c8b596;
+    --t-mine:       #a89584;
+    --t-lava:       #d9917c;
+    --t-tomb:       #8f8faa;
+    --t-desert:     #ecd9a4;
+    --t-graveyard:  #b0a89c;
+    --t-city:       #e0c78e;
+    --t-spawn:      #ffd97a;
+    --t-house:      #d8c2a3;
+    --t-abandoned:  #b8a898;
+    --t-empty:      #efe8d8;
+
+    /* Content — high-contrast solid fills; the marker draws on top of terrain. */
+    --c-monster:   #d43a2a;
+    --c-resource:  #2e8a4a;
+    --c-npc:       #2a68c8;
+    --c-workshop:  #b56a15;
+    --c-bank:      #8a5a1a;
+    --c-exchange:  #7a2ca8;
+    --c-tasks:     #c88a1a;
+    --c-raid:      #b0002a;
+    --player:      #ffdd33;
   }
   * { box-sizing: border-box; }
   body {
-    margin: 0; padding: 12px; background: var(--bg); color: var(--ink);
-    font: 12px/1.4 ui-monospace, "SF Mono", Menlo, monospace;
-    display: grid; grid-template-columns: 1fr 260px; gap: 12px; height: 100vh;
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: grid; grid-template-columns: 1fr 300px; gap: 12px;
+    padding: 12px; height: 100vh; overflow: hidden;
   }
   #main { display: flex; flex-direction: column; min-width: 0; }
-  header { display: flex; align-items: center; gap: 12px; padding: 0 4px 8px; flex-wrap: wrap; }
-  h1 { font-size: 14px; font-weight: 600; margin: 0; letter-spacing: .08em; text-transform: uppercase; }
-  .layers { display: flex; gap: 4px; }
+  header { display: flex; align-items: center; gap: 12px; padding: 0 4px 10px; flex-wrap: wrap; }
+  h1 { font-size: 15px; font-weight: 700; margin: 0; letter-spacing: .02em; }
+  h1 a { color: var(--accent); text-decoration: none; margin-left: 12px; font-weight: 500; font-size: 13px; }
+  .layers { display: inline-flex; background: #fff; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
   .layers button {
-    background: var(--panel); color: var(--ink); border: 1px solid var(--line);
-    border-radius: 4px; padding: 4px 10px; cursor: pointer; font: inherit;
+    background: transparent; color: var(--ink); border: 0; border-right: 1px solid var(--line);
+    padding: 6px 14px; cursor: pointer; font: inherit; text-transform: capitalize;
   }
-  .layers button.active { border-color: var(--accent); color: var(--accent); }
-  .meta { color: var(--dim); margin-left: auto; }
+  .layers button:last-child { border-right: 0; }
+  .layers button.active { background: var(--accent); color: #fff; }
+  .meta { color: var(--dim); margin-left: auto; font-variant-numeric: tabular-nums; font-size: 12px; }
   #stage {
-    flex: 1; background: #0f0c09; border: 1px solid var(--line); border-radius: 6px;
+    flex: 1; background: #fff; border: 1px solid var(--line); border-radius: 6px;
     overflow: hidden; position: relative; cursor: grab;
   }
   #stage.dragging { cursor: grabbing; }
   svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; }
-  .tile { stroke: rgba(0,0,0,.35); stroke-width: .05; }
-  .marker { pointer-events: none; }
-  .content { font-size: 6px; text-anchor: middle; dominant-baseline: central; fill: rgba(0,0,0,.7); font-weight: 700; pointer-events: none; }
-  .player-halo { fill: var(--player); opacity: .35; }
-  .player-dot { fill: var(--player); stroke: #000; stroke-width: .12; }
-  .player-label { font-size: 5.5px; text-anchor: middle; fill: var(--ink); paint-order: stroke; stroke: #000; stroke-width: 1.2; stroke-linejoin: round; pointer-events: none; }
-  #side { display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
-  .panel h2 { font-size: 11px; font-weight: 600; margin: 0 0 8px; color: var(--dim); letter-spacing: .08em; text-transform: uppercase; }
-  .legend { display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; align-items: center; }
-  .swatch { width: 12px; height: 12px; border-radius: 2px; border: 1px solid rgba(0,0,0,.4); }
-  .glyph { width: 12px; text-align: center; font-weight: 700; color: rgba(0,0,0,.7); background: var(--player); border-radius: 2px; }
-  #chars { overflow-y: auto; }
-  .row { padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 11px; }
-  .row:last-child { border-bottom: none; }
-  .row .name { font-weight: 600; }
-  .row .where { color: var(--dim); font-size: 10px; }
-  #tooltip {
-    position: absolute; pointer-events: none; background: rgba(15,12,9,.95);
-    border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px;
-    font-size: 11px; max-width: 220px; display: none; z-index: 10;
+  .tile { stroke: rgba(0,0,0,.10); stroke-width: .03; }
+  .grid-major { stroke: rgba(0,0,0,.22); stroke-width: .04; fill: none; }
+  .axis { fill: var(--dim); font: 700 .55px system-ui, sans-serif; text-anchor: middle; }
+  .content-bg { stroke: #fff; stroke-width: .08; }
+  .content-glyph {
+    font: 800 .55px system-ui, sans-serif;
+    text-anchor: middle; dominant-baseline: central;
+    fill: #fff; pointer-events: none;
   }
+  .arrow { stroke-width: .06; fill: none; }
+  .player-halo { fill: var(--player); opacity: .45; }
+  .player-dot { fill: var(--player); stroke: #000; stroke-width: .10; }
+  .player-label {
+    font: 800 .48px system-ui, sans-serif; text-anchor: middle;
+    fill: #000; paint-order: stroke;
+    stroke: var(--player); stroke-width: .18; stroke-linejoin: round;
+    pointer-events: none;
+  }
+  #side { display: flex; flex-direction: column; gap: 10px; overflow: hidden; min-height: 0; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+  .panel h2 { font-size: 11px; font-weight: 700; margin: 0 0 8px; color: var(--dim); letter-spacing: .06em; text-transform: uppercase; }
+  .legend { display: grid; grid-template-columns: 18px 1fr auto; gap: 6px 8px; align-items: center; font-size: 12px; }
+  .swatch { width: 18px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.15); }
+  .glyph { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; color: #fff; font: 700 11px system-ui, sans-serif; }
+  .legend .count { color: var(--dim); font-variant-numeric: tabular-nums; }
+  #chars { overflow-y: auto; min-height: 0; }
+  .row { padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 12px; }
+  .row:last-child { border-bottom: none; }
+  .row .top { display: flex; justify-content: space-between; align-items: baseline; }
+  .row .name { font-weight: 700; }
+  .row .lvl { color: var(--dim); font-size: 11px; }
+  .row .where { color: var(--dim); font-size: 11px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .row .doing { font-size: 11px; margin-top: 2px; }
+  .row .doing.busy { color: var(--accent); font-weight: 600; }
+  #tooltip {
+    position: absolute; pointer-events: none; background: #1c1a17; color: #fff;
+    border-radius: 4px; padding: 6px 10px; font-size: 12px; line-height: 1.4;
+    max-width: 240px; display: none; z-index: 10;
+    box-shadow: 0 6px 16px rgba(0,0,0,.25);
+  }
+  #tooltip b { color: var(--player); }
+  #tooltip .tt-content { display: inline-block; padding: 1px 6px; border-radius: 3px; color: #fff; font-weight: 700; margin-top: 4px; }
+  #hint { position: absolute; bottom: 10px; right: 12px; color: var(--dim); font-size: 11px; background: rgba(255,255,255,.85); padding: 4px 8px; border-radius: 4px; }
 </style>
 </head>
 <body>
 <div id="main">
   <header>
-    <h1>World Map</h1> <a href="/" style="color:var(--accent);text-decoration:none;font-size:12px;letter-spacing:.06em">→ CHARACTERS</a>
+    <h1>World Map <a href="/">→ Characters</a></h1>
     <div class="layers" id="layers"></div>
     <span class="meta" id="status">loading…</span>
   </header>
   <div id="stage">
-    <svg id="canvas" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
+    <svg id="canvas"></svg>
     <div id="tooltip"></div>
+    <div id="hint">drag to pan · scroll to zoom · hover a tile</div>
   </div>
 </div>
 <aside id="side">
@@ -79,79 +132,70 @@
     <div class="legend" id="terrain-legend"></div>
   </div>
   <div class="panel">
-    <h2>Content</h2>
+    <h2>What's on tiles</h2>
     <div class="legend" id="content-legend"></div>
   </div>
-  <div class="panel" id="chars-panel">
-    <h2>Characters</h2>
+  <div class="panel" style="display:flex;flex-direction:column;min-height:0;flex:1">
+    <h2>Characters (<span id="char-count">0</span>)</h2>
     <div id="chars"></div>
   </div>
 </aside>
 
 <script>
-const TERRAIN = [
-  ["forest", "var(--forest)", "Forest"],
-  ["water", "var(--water)", "Water / lake / sea"],
-  ["mountain", "var(--mountain)", "Mountain / mine"],
-  ["desertisland", "var(--desert)", "Desert island"],
-  ["underground", "var(--underground)", "Underground"],
-  ["lavaunderground", "var(--lava)", "Lava underground"],
-  ["interior", "var(--interior)", "Interior"],
-  ["spawn", "var(--spawn)", "Spawn"],
-  ["empty", "var(--empty)", "Empty"],
-];
-const CONTENT = [
-  ["M", "monster", "var(--monster)"],
-  ["R", "resource", "var(--resource)"],
-  ["N", "npc", "var(--npc)"],
-  ["W", "workshop", "var(--workshop)"],
-  ["B", "bank", "var(--bank)"],
-  ["X", "grand_exchange", "var(--exchange)"],
-  ["T", "tasks_master", "var(--tasks)"],
-  ["!", "raid", "var(--raid)"],
-];
-const CONTENT_GLYPH = Object.fromEntries(CONTENT.map(([g, k]) => [k, g]));
-const CONTENT_COLOR = Object.fromEntries(CONTENT.map(([, k, c]) => [k, c]));
-
-function terrainColor(tile) {
-  const fam = (tile.family || "").toLowerCase();
-  if (!fam || fam === "empty") return "var(--empty)";
-  for (const [prefix, color] of TERRAIN) {
-    if (fam === prefix || fam.startsWith(prefix + "_") || fam.startsWith(prefix)) return color;
-  }
-  if (fam.includes("lake") || fam.includes("sea") || fam.includes("coastline")) return "var(--water)";
-  if (fam.includes("mine")) return "var(--mountain)";
-  if (fam.includes("house") || fam.includes("village")) return "var(--interior)";
-  return "var(--forest)";
+// Colors keyed to the tile "name" field (only ~15 distinct values across the world),
+// so a Forest tile actually looks like forest and Sea like sea, not "family_47".
+const TERRAIN_BY_NAME = {
+  "Forest":            { color: "var(--t-forest)",    label: "Forest" },
+  "Forest (Forge)":    { color: "var(--t-forge)",     label: "Forest (Forge)" },
+  "Enchanted Forest":  { color: "var(--t-enchanted)", label: "Enchanted Forest" },
+  "Sea":               { color: "var(--t-sea)",       label: "Sea" },
+  "Lake":              { color: "var(--t-lake)",      label: "Lake" },
+  "Mountain":          { color: "var(--t-mountain)",  label: "Mountain" },
+  "Mine":              { color: "var(--t-mine)",      label: "Mine" },
+  "Sandwhisper Mine":  { color: "var(--t-mine)",      label: "Sandwhisper Mine" },
+  "Sandwhisper Isle":  { color: "var(--t-desert)",    label: "Sandwhisper Isle" },
+  "Lava Underground":  { color: "var(--t-lava)",      label: "Lava Underground" },
+  "Lich Tomb":         { color: "var(--t-tomb)",      label: "Lich Tomb" },
+  "Graveyard":         { color: "var(--t-graveyard)", label: "Graveyard" },
+  "City":              { color: "var(--t-city)",      label: "City" },
+  "Spawn":             { color: "var(--t-spawn)",     label: "Spawn point" },
+  "Rosenblood House":  { color: "var(--t-house)",     label: "Rosenblood House" },
+  "Empress House":     { color: "var(--t-house)",     label: "Empress House" },
+  "Abandoned House":   { color: "var(--t-abandoned)", label: "Abandoned House" },
+  "Empty":             { color: "var(--t-empty)",     label: "Empty / passable" },
+};
+function terrainFor(t) {
+  return TERRAIN_BY_NAME[t.name] || { color: "var(--t-empty)", label: t.name || "?" };
 }
 
-function renderLegends() {
-  document.getElementById("terrain-legend").innerHTML = TERRAIN.map(
-    ([, color, label]) => `<div class="swatch" style="background:${color}"></div><div>${label}</div>`
-  ).join("");
-  document.getElementById("content-legend").innerHTML = CONTENT.map(
-    ([glyph, key, color]) => `<div class="glyph" style="background:${color}">${glyph}</div><div>${key.replace(/_/g, " ")}</div>`
-  ).join("") + `<div class="glyph" style="background:var(--player)">●</div><div>character</div>`;
-}
-renderLegends();
+const CONTENT = {
+  monster:        { glyph: "M", color: "var(--c-monster)",  label: "Monster" },
+  resource:       { glyph: "R", color: "var(--c-resource)", label: "Resource node" },
+  npc:            { glyph: "N", color: "var(--c-npc)",      label: "NPC merchant" },
+  workshop:       { glyph: "W", color: "var(--c-workshop)", label: "Workshop" },
+  bank:           { glyph: "B", color: "var(--c-bank)",     label: "Bank" },
+  grand_exchange: { glyph: "X", color: "var(--c-exchange)", label: "Grand exchange" },
+  tasks_master:   { glyph: "T", color: "var(--c-tasks)",    label: "Tasks master" },
+  raid:           { glyph: "!", color: "var(--c-raid)",     label: "Raid" },
+};
 
 let world = { tiles: [], bounds: {}, characters: [] };
 let activeLayer = "overworld";
-let view = { scale: 1, tx: 0, ty: 0 };
+let view = { scale: 1, tx: 0, ty: 0, initialised: false };
 
 const svg = document.getElementById("canvas");
+const stage = document.getElementById("stage");
 const tooltip = document.getElementById("tooltip");
 
 function renderLayerButtons() {
-  const layers = Object.keys(world.bounds);
-  const html = layers.map(l => `<button data-layer="${l}" class="${l === activeLayer ? "active" : ""}">${l}</button>`).join("");
+  const layers = Object.keys(world.bounds).sort();
   const el = document.getElementById("layers");
   if (el.dataset.layers !== layers.join(",")) {
-    el.innerHTML = html;
     el.dataset.layers = layers.join(",");
+    el.innerHTML = layers.map(l => `<button data-layer="${l}" class="${l === activeLayer ? "active" : ""}">${l}</button>`).join("");
     el.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
       activeLayer = b.dataset.layer;
-      view = { scale: 1, tx: 0, ty: 0 };
+      view.initialised = false;
       renderLayerButtons();
       renderMap();
     }));
@@ -160,93 +204,177 @@ function renderLayerButtons() {
   }
 }
 
+// Fit the layer's bounds into the current stage size, so the whole map appears
+// at the largest zoom that shows it all — no scrolling required to see it.
+function initialFit(bounds) {
+  const pad = 1.5;
+  const w = bounds.max_x - bounds.min_x + 1 + pad * 2;
+  const h = bounds.max_y - bounds.min_y + 1 + pad * 2;
+  const rect = stage.getBoundingClientRect();
+  const scale = Math.min(rect.width / w, rect.height / h);
+  const centerX = (bounds.min_x - pad) + w / 2;
+  const centerY = (bounds.min_y - pad) + h / 2;
+  view = {
+    scale,
+    tx: rect.width / 2 - centerX * scale,
+    ty: rect.height / 2 - centerY * scale,
+    initialised: true,
+  };
+}
+
 function renderMap() {
   const bounds = world.bounds[activeLayer];
   if (!bounds) { svg.innerHTML = ""; return; }
-  const w = bounds.max_x - bounds.min_x + 1;
-  const h = bounds.max_y - bounds.min_y + 1;
-  const pad = 2;
-  svg.setAttribute("viewBox", `${bounds.min_x - pad} ${bounds.min_y - pad} ${w + pad * 2} ${h + pad * 2}`);
+  if (!view.initialised) initialFit(bounds);
+
+  const rect = stage.getBoundingClientRect();
+  svg.setAttribute("viewBox", `0 0 ${rect.width} ${rect.height}`);
 
   const tiles = world.tiles.filter(t => t.layer === activeLayer);
-  const parts = tiles.map(t => {
-    const fill = terrainColor(t);
-    return `<rect class="tile" x="${t.x}" y="${t.y}" width="1" height="1" fill="${fill}" data-i="${t.map_id}"></rect>`;
-  });
+  const parts = [];
 
   for (const t of tiles) {
-    if (t.content_type && CONTENT_GLYPH[t.content_type]) {
-      parts.push(`<circle class="marker" cx="${t.x + 0.5}" cy="${t.y + 0.5}" r="0.32" fill="${CONTENT_COLOR[t.content_type]}"/>`);
-      parts.push(`<text class="content" x="${t.x + 0.5}" y="${t.y + 0.55}">${CONTENT_GLYPH[t.content_type]}</text>`);
+    const fill = terrainFor(t).color;
+    parts.push(`<rect class="tile" x="${t.x}" y="${t.y}" width="1" height="1" fill="${fill}" data-i="${t.map_id}"></rect>`);
+  }
+
+  // Coordinate axes: numbers along every 5 tiles so you can find (x, y) at a glance.
+  for (let x = Math.floor(bounds.min_x / 5) * 5; x <= bounds.max_x; x += 5) {
+    parts.push(`<text class="axis" x="${x + 0.5}" y="${bounds.min_y - 0.4}">${x}</text>`);
+  }
+  for (let y = Math.floor(bounds.min_y / 5) * 5; y <= bounds.max_y; y += 5) {
+    parts.push(`<text class="axis" x="${bounds.min_x - 0.5}" y="${y + 0.6}">${y}</text>`);
+  }
+
+  // Content markers on top of terrain; big enough to read at fit-zoom.
+  for (const t of tiles) {
+    if (t.content_type && CONTENT[t.content_type]) {
+      const c = CONTENT[t.content_type];
+      parts.push(`<circle class="content-bg" cx="${t.x + 0.5}" cy="${t.y + 0.5}" r="0.36" fill="${c.color}"></circle>`);
+      parts.push(`<text class="content-glyph" x="${t.x + 0.5}" y="${t.y + 0.55}">${c.glyph}</text>`);
     } else if (t.transition) {
-      parts.push(`<path class="marker" d="M${t.x + 0.2},${t.y + 0.5} L${t.x + 0.8},${t.y + 0.5} M${t.x + 0.6},${t.y + 0.3} L${t.x + 0.8},${t.y + 0.5} L${t.x + 0.6},${t.y + 0.7}" stroke="${t.transition_gated ? '#d4614f' : '#f0e6db'}" stroke-width="0.08" fill="none"/>`);
+      const stroke = t.transition_gated ? "var(--c-raid)" : "var(--dim)";
+      parts.push(`<path class="arrow" d="M${t.x + 0.28} ${t.y + 0.5} L${t.x + 0.72} ${t.y + 0.5} M${t.x + 0.58} ${t.y + 0.35} L${t.x + 0.72} ${t.y + 0.5} L${t.x + 0.58} ${t.y + 0.65}" stroke="${stroke}"></path>`);
     }
   }
 
+  // Characters last, so they draw over everything.
   for (const c of world.characters) {
     if (c.layer !== activeLayer) continue;
-    parts.push(`<circle class="player-halo" cx="${c.x + 0.5}" cy="${c.y + 0.5}" r="0.9"/>`);
-    parts.push(`<circle class="player-dot" cx="${c.x + 0.5}" cy="${c.y + 0.5}" r="0.35"/>`);
-    parts.push(`<text class="player-label" x="${c.x + 0.5}" y="${c.y - 0.1}">${c.name}</text>`);
+    parts.push(`<circle class="player-halo" cx="${c.x + 0.5}" cy="${c.y + 0.5}" r="1.1"></circle>`);
+    parts.push(`<circle class="player-dot" cx="${c.x + 0.5}" cy="${c.y + 0.5}" r="0.42"></circle>`);
+    parts.push(`<text class="player-label" x="${c.x + 0.5}" y="${c.y - 0.15}">${c.name}</text>`);
   }
 
-  const gTransform = `translate(${view.tx} ${view.ty}) scale(${view.scale})`;
-  svg.innerHTML = `<g transform="${gTransform}">${parts.join("")}</g>`;
+  svg.innerHTML = `<g id="viewport" transform="translate(${view.tx} ${view.ty}) scale(${view.scale})">${parts.join("")}</g>`;
+  wireTooltips(tiles);
+}
 
+function wireTooltips(tiles) {
+  const byId = new Map(tiles.map(t => [String(t.map_id), t]));
   svg.querySelectorAll(".tile").forEach(r => {
     r.addEventListener("mousemove", (ev) => {
-      const t = tiles.find(x => x.map_id == r.dataset.i);
+      const t = byId.get(r.dataset.i);
       if (!t) return;
+      const rect = stage.getBoundingClientRect();
       tooltip.style.display = "block";
-      tooltip.style.left = (ev.clientX - svg.getBoundingClientRect().left + 12) + "px";
-      tooltip.style.top = (ev.clientY - svg.getBoundingClientRect().top + 12) + "px";
-      tooltip.innerHTML = `<b>${t.name}</b> (${t.x}, ${t.y})<br>${t.skin || ""}` +
-        (t.content_type ? `<br>${t.content_type}: <b>${t.content_code}</b>` : "") +
-        (t.transition ? `<br>→ ${t.transition}${t.transition_gated ? " (gated)" : ""}` : "");
+      tooltip.style.left = (ev.clientX - rect.left + 14) + "px";
+      tooltip.style.top  = (ev.clientY - rect.top  + 14) + "px";
+      let content = "";
+      if (t.content_type) {
+        const c = CONTENT[t.content_type];
+        content = `<div class="tt-content" style="background:${c && c.color}">${(c && c.label) || t.content_type}: ${t.content_code}</div>`;
+      } else if (t.transition) {
+        content = `<div class="tt-content" style="background:${t.transition_gated ? 'var(--c-raid)' : 'var(--dim)'}">→ ${t.transition}${t.transition_gated ? " (locked)" : ""}</div>`;
+      }
+      tooltip.innerHTML = `<b>${t.name || "?"}</b> · (${t.x}, ${t.y})<br><span style="color:#c9c1b3">${t.skin || ""}</span>${content}`;
     });
     r.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
   });
 }
 
+function renderLegends() {
+  const el = document.getElementById("terrain-legend");
+  const counts = {};
+  for (const t of world.tiles) {
+    if (t.layer !== activeLayer) continue;
+    counts[t.name] = (counts[t.name] || 0) + 1;
+  }
+  const rows = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, n]) => {
+      const info = TERRAIN_BY_NAME[name] || { color: "var(--t-empty)", label: name };
+      return `<div class="swatch" style="background:${info.color}"></div><div>${info.label}</div><div class="count">${n}</div>`;
+    });
+  el.innerHTML = rows.join("");
+
+  const cc = {};
+  for (const t of world.tiles) {
+    if (t.layer !== activeLayer || !t.content_type) continue;
+    cc[t.content_type] = (cc[t.content_type] || 0) + 1;
+  }
+  document.getElementById("content-legend").innerHTML =
+    Object.entries(CONTENT).map(([k, c]) =>
+      `<div class="glyph" style="background:${c.color}">${c.glyph}</div><div>${c.label}</div><div class="count">${cc[k] || 0}</div>`
+    ).join("") +
+    `<div class="glyph" style="background:var(--player);color:#000">●</div><div>Character</div><div class="count">${world.characters.filter(c => c.layer === activeLayer).length}</div>`;
+}
+
+const VERB = {
+  move: "moving", fight: "fighting", gathering: "gathering", crafting: "crafting",
+  rest: "resting", recycling: "recycling", use: "using", equip: "equipping",
+  unequip: "unequipping", "task/new": "taking a task", "task/complete": "turning in",
+  "bank/deposit/item": "banking", "bank/withdraw/item": "withdrawing",
+  "npc/buy": "buying", "npc/sell": "selling", transition: "descending",
+};
+
 function renderChars() {
+  document.getElementById("char-count").textContent = world.characters.length;
   document.getElementById("chars").innerHTML = world.characters.map(c => {
-    const cd = c.cooldown_expiration
-      ? Math.max(0, (new Date(c.cooldown_expiration) - Date.now()) / 1000).toFixed(1) + "s"
-      : "idle";
+    const left = c.cooldown_expiration ? Math.max(0, (new Date(c.cooldown_expiration) - Date.now()) / 1000) : 0;
+    const last = c.last_action;
+    let doing = "idle";
+    let cls = "";
+    if (left > 0 && last) { doing = `${VERB[last.action] || last.action} · ${left.toFixed(1)}s`; cls = "busy"; }
+    else if (left > 0) { doing = `busy · ${left.toFixed(1)}s`; cls = "busy"; }
+    else if (last) { doing = `after ${VERB[last.action] || last.action}`; }
     return `<div class="row">
-      <div class="name">${c.name} <span style="color:var(--dim)">lv ${c.level}</span></div>
-      <div class="where">${c.layer || "?"} (${c.x}, ${c.y}) · ${cd}</div>
+      <div class="top"><span class="name">${c.name}</span><span class="lvl">lv ${c.level} · ${c.gold}g</span></div>
+      <div class="where">${c.layer || "?"} (${c.x}, ${c.y}) · hp ${c.hp}/${c.max_hp}</div>
+      <div class="doing ${cls}">${doing}</div>
     </div>`;
   }).join("");
 }
 
-// Pan and zoom with the mouse; the SVG transform is the source of truth.
-const stage = document.getElementById("stage");
+// Pan and zoom.
 let dragging = null;
-stage.addEventListener("mousedown", (ev) => { dragging = { x: ev.clientX, y: ev.clientY, tx: view.tx, ty: view.ty }; stage.classList.add("dragging"); });
+stage.addEventListener("mousedown", (ev) => {
+  dragging = { x: ev.clientX, y: ev.clientY, tx: view.tx, ty: view.ty };
+  stage.classList.add("dragging");
+});
 window.addEventListener("mouseup", () => { dragging = null; stage.classList.remove("dragging"); });
 window.addEventListener("mousemove", (ev) => {
   if (!dragging) return;
-  const rect = svg.getBoundingClientRect();
-  const vb = svg.viewBox.baseVal;
-  const px = vb.width / rect.width;
-  view.tx = dragging.tx + (ev.clientX - dragging.x) * px;
-  view.ty = dragging.ty + (ev.clientY - dragging.y) * px;
-  const g = svg.querySelector("g"); if (g) g.setAttribute("transform", `translate(${view.tx} ${view.ty}) scale(${view.scale})`);
+  view.tx = dragging.tx + (ev.clientX - dragging.x);
+  view.ty = dragging.ty + (ev.clientY - dragging.y);
+  const g = svg.querySelector("#viewport");
+  if (g) g.setAttribute("transform", `translate(${view.tx} ${view.ty}) scale(${view.scale})`);
 });
 stage.addEventListener("wheel", (ev) => {
   ev.preventDefault();
-  const rect = svg.getBoundingClientRect();
-  const vb = svg.viewBox.baseVal;
-  const mx = vb.x + (ev.clientX - rect.left) / rect.width * vb.width;
-  const my = vb.y + (ev.clientY - rect.top) / rect.height * vb.height;
-  const factor = ev.deltaY < 0 ? 1.15 : 1 / 1.15;
-  const next = Math.max(0.6, Math.min(8, view.scale * factor));
+  const rect = stage.getBoundingClientRect();
+  const mx = ev.clientX - rect.left;
+  const my = ev.clientY - rect.top;
+  const factor = ev.deltaY < 0 ? 1.2 : 1 / 1.2;
+  const next = Math.max(4, Math.min(120, view.scale * factor));
   view.tx = mx - (mx - view.tx) * (next / view.scale);
   view.ty = my - (my - view.ty) * (next / view.scale);
   view.scale = next;
-  const g = svg.querySelector("g"); if (g) g.setAttribute("transform", `translate(${view.tx} ${view.ty}) scale(${view.scale})`);
+  const g = svg.querySelector("#viewport");
+  if (g) g.setAttribute("transform", `translate(${view.tx} ${view.ty}) scale(${view.scale})`);
 }, { passive: false });
+
+window.addEventListener("resize", () => { view.initialised = false; renderMap(); });
 
 async function poll() {
   try {
@@ -257,10 +385,11 @@ async function poll() {
       return;
     }
     if (!world.bounds[activeLayer]) activeLayer = Object.keys(world.bounds)[0];
-    const status = `${world.tiles.length} tiles · ${world.characters.length} characters · updated ${new Date(world.fetched_at).toLocaleTimeString()}`;
-    document.getElementById("status").textContent = status;
+    document.getElementById("status").textContent =
+      `${world.tiles.length} tiles · ${world.characters.length} characters · ${new Date(world.fetched_at).toLocaleTimeString()}`;
     renderLayerButtons();
     renderMap();
+    renderLegends();
     renderChars();
   } catch (err) {
     document.getElementById("status").textContent = "server unreachable";
