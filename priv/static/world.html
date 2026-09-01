@@ -198,6 +198,8 @@ function renderLayerButtons() {
       view.initialised = false;
       renderLayerButtons();
       renderMap();
+      renderLegends();
+      renderChars();
     }));
   } else {
     el.querySelectorAll("button").forEach(b => b.classList.toggle("active", b.dataset.layer === activeLayer));
@@ -258,12 +260,33 @@ function renderMap() {
     }
   }
 
-  // Characters last, so they draw over everything.
+  // Characters last, so they draw over everything. Co-located characters are
+  // grouped so five labels stacked at spawn do not overwrite one another.
+  const clusters = new Map();
   for (const c of world.characters) {
     if (c.layer !== activeLayer) continue;
-    parts.push(`<circle class="player-halo" cx="${c.x + 0.5}" cy="${c.y + 0.5}" r="1.1"></circle>`);
-    parts.push(`<circle class="player-dot" cx="${c.x + 0.5}" cy="${c.y + 0.5}" r="0.42"></circle>`);
-    parts.push(`<text class="player-label" x="${c.x + 0.5}" y="${c.y - 0.15}">${c.name}</text>`);
+    const key = `${c.x},${c.y}`;
+    if (!clusters.has(key)) clusters.set(key, []);
+    clusters.get(key).push(c);
+  }
+  for (const [key, group] of clusters) {
+    const [gx, gy] = key.split(",").map(Number);
+    const cx = gx + 0.5, cy = gy + 0.5;
+    const radius = 0.42 + 0.08 * Math.min(group.length - 1, 4);
+    parts.push(`<circle class="player-halo" cx="${cx}" cy="${cy}" r="${1.0 + radius * 0.4}"></circle>`);
+    if (group.length === 1) {
+      parts.push(`<circle class="player-dot" cx="${cx}" cy="${cy}" r="${radius}"></circle>`);
+    } else {
+      group.forEach((_, i) => {
+        const t = (i / group.length) * Math.PI * 2;
+        parts.push(`<circle class="player-dot" cx="${cx + Math.cos(t) * 0.22}" cy="${cy + Math.sin(t) * 0.22}" r="0.24"></circle>`);
+      });
+    }
+    const lineH = 0.55;
+    group.forEach((c, i) => {
+      const y = cy - radius - 0.25 - (group.length - 1 - i) * lineH;
+      parts.push(`<text class="player-label" x="${cx}" y="${y}">${c.name}</text>`);
+    });
   }
 
   svg.innerHTML = `<g id="viewport" transform="translate(${view.tx} ${view.ty}) scale(${view.scale})">${parts.join("")}</g>`;
