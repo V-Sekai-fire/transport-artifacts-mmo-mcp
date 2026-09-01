@@ -533,6 +533,7 @@ function initialFit(m) {
   const cy = (f.y - m.min_y) + 0.5;
   view = {
     scale,
+    minScale: scale,
     tx: rect.width  / 2 - cx * m.tile_size * scale,
     ty: rect.height / 2 - cy * m.tile_size * scale,
     initialised: true,
@@ -813,7 +814,7 @@ stage.addEventListener("wheel", (ev) => {
   const rect = stage.getBoundingClientRect();
   const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
   const factor = ev.deltaY < 0 ? 1.2 : 1 / 1.2;
-  const next = Math.max(0.5, Math.min(8, view.scale * factor));
+  const next = Math.max(view.minScale || view.scale, Math.min(8, view.scale * factor));
   view.tx = mx - (mx - view.tx) * (next / view.scale);
   view.ty = my - (my - view.ty) * (next / view.scale);
   view.scale = next;
