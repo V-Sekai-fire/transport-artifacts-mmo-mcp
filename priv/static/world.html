@@ -305,8 +305,22 @@ const ICONS = {
     <path d="M8 4 L8 12"/></g>`,
 };
 
+// Wan-generated PNGs override the vector icon when a manifest lists them,
+// so a future render pass silently upgrades any category without a code
+// change. Absent manifest = words + icons stay as they are.
+const wanExists = new Set();
+async function loadWanManifest() {
+  try {
+    const res = await fetch("/static/wan/manifest.json", { cache: "no-cache" });
+    if (!res.ok) return;
+    for (const k of await res.json()) wanExists.add(k);
+  } catch { /* no wan sprites yet */ }
+}
+
 function iconFor(type, code) {
   code = code || "";
+  const wanKey = `${type}-${code}`;
+  if (wanExists.has(wanKey)) return { sprite: `/static/wan/${wanKey}.png`, border: "#c45a1a" };
   if (type === "bank") return { icon: "chest_i", border: "#a67a3a" };
   if (type === "grand_exchange") return { icon: "coin", border: "#c27ac6" };
   if (type === "raid") {
@@ -537,7 +551,9 @@ function renderMap() {
     const c = iconFor(t.content_type, t.content_code || "");
     const inset = 1.5;
     parts.push(`<rect x="${px + inset}" y="${py + inset}" width="${m.tile_size - inset * 2}" height="${m.tile_size - inset * 2}" fill="#fefbf1" stroke="${c.border}" stroke-width="0.6" rx="2"/>`);
-    if (c.icon) {
+    if (c.sprite) {
+      parts.push(`<image href="${c.sprite}" x="${px + inset + 1}" y="${py + inset + 1}" width="${m.tile_size - inset * 2 - 2}" height="${m.tile_size - inset * 2 - 2}"/>`);
+    } else if (c.icon) {
       const iconInset = 2;
       const scale = (m.tile_size - inset * 2 - iconInset * 2) / 16;
       const tx = px + inset + iconInset;
