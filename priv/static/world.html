@@ -247,6 +247,57 @@ const PALETTE = [
   { sprite: null, color: "#3a83d4" },
 ];
 
+// Terrain fill colors, keyed to the game "name" field. Pure SVG rects, so
+// the map is resolution-independent — no composited PNG that can go wrong.
+// Mirrors scripts/build_maps.py TERRAIN so the offline artefact and the
+// live view agree.
+const TERRAIN_FILL = {
+  "Forest":            "#8ec882",
+  "Sea":               "#6496d2",
+  "Sandwhisper Isle":  "#e6d282",
+  "City":              "#d7c8a5",
+  "Graveyard":         "#a0a58c",
+  "Enchanted Forest":  "#b991d2",
+  "Mountain":          "#aa9b82",
+  "Lake":              "#82beel",
+  "Spawn":             "#ffd23c",
+  "Forest (Forge)":    "#cdaa6e",
+  "Empty":             null,
+  "Lava Underground":  "#e66e3c",
+  "Mine":              "#a5917d",
+  "Sandwhisper Mine":  "#e6d28c",
+  "Lich Tomb":         "#9b7dbe",
+  "Abandoned House":   "#be9078",
+  "Rosenblood House":  "#d28278",
+  "Empress House":     "#ebc878",
+};
+const EMPTY_FILL = { overworld: "#8ec882", underground: "#cdc2aa", interior: null };
+
+// Decor placed on top of terrain, per game name. Small individual PNGs, one
+// per tile at most — scales without breaking because each image is 64 px.
+const DECOR = {
+  "Forest":            [["tree", 0.30], ["plants", 0.12]],
+  "Enchanted Forest":  [["tree", 0.50], ["plants", 0.30]],
+  "Sandwhisper Isle":  [["plants", 0.15]],
+  "Mountain":          [["wall_damaged", 0.15]],
+  "Graveyard":         [["coffin", 0.40]],
+  "City":              [["chair", 0.10]],
+  "Mine":              [["wall_damaged", 0.20]],
+  "Lava Underground":  [["campfire", 0.15]],
+  "Lich Tomb":         [["coffin", 0.50]],
+};
+
+// Deterministic PRNG so re-renders on the same tile get the same decor
+// (no jitter as the map polls).
+function tileRand(x, y, layer) {
+  let h = ((x * 73856093) ^ (y * 19349663) ^ hashStr(layer)) >>> 0;
+  return () => { h = (h * 1664525 + 1013904223) >>> 0; return h / 0x100000000; };
+}
+function hashStr(s) {
+  let h = 0; for (const c of s) h = ((h * 31 + c.charCodeAt(0)) | 0) >>> 0;
+  return h;
+}
+
 let world = { tiles: [], bounds: {}, characters: [], feed: [] };
 let mapMeta = null;
 let activeLayer = "overworld";
@@ -265,11 +316,17 @@ const charColor = (name) => {
   return PALETTE[Math.abs(h) % PALETTE.length];
 };
 
-async function loadMeta() {
-  if (mapMeta) return mapMeta;
-  const res = await fetch("/static/maps/meta.json", { cache: "no-cache" });
-  mapMeta = await res.json();
-  return mapMeta;
+function computeMeta(bounds) {
+  const tile_size = 32;  // logical world-units per tile in the SVG
+  const meta = {};
+  for (const [layer, b] of Object.entries(bounds)) {
+    meta[layer] = {
+      ...b, tile_size,
+      width:  (b.max_x - b.min_x + 1) * tile_size,
+      height: (b.max_y - b.min_y + 1) * tile_size,
+    };
+  }
+  return meta;
 }
 
 function renderLayerButtons() {
@@ -316,8 +373,29 @@ function renderMap() {
   const tiles = world.tiles.filter(t => t.layer === activeLayer);
   const parts = [];
 
-  // Background image: the composited terrain PNG.
-  parts.push(`<image href="/static/maps/${activeLayer}.png" x="0" y="0" width="${m.width}" height="${m.height}" style="image-rendering:pixelated"/>`);
+  // Terrain as inline SVG rects — vector, scales cleanly at any zoom.
+  const empty = EMPTY_FILL[activeLayer];
+  for (const t of tiles) {
+    const { px, py } = tilePx(t, m);
+    const fill = TERRAIN_FILL[t.name];
+    const color = fill === null ? empty : (fill || empty);
+    if (color) {
+      parts.push(`<rect x="${px}" y="${py}" width="${m.tile_size}" height="${m.tile_size}" fill="${color}"/>`);
+    }
+  }
+
+  // Deterministic decor on top of the terrain, keyed to the game "name".
+  for (const t of tiles) {
+    const decor = DECOR[t.name];
+    if (!decor) continue;
+    const rnd = tileRand(t.x, t.y, activeLayer);
+    for (const [name, chance] of decor) {
+      if (rnd() < chance) {
+        const { px, py } = tilePx(t, m);
+        parts.push(`<image href="/static/scribble/${name}.png" x="${px}" y="${py}" width="${m.tile_size}" height="${m.tile_size}" preserveAspectRatio="xMidYMid meet"/>`);
+      }
+    }
+  }
 
   // Content overlays — either a scribble sprite or a word label per tile.
   for (const t of tiles) {
@@ -538,7 +616,7 @@ window.addEventListener("resize", () => { view.initialised = false; renderMap();
 
 async function poll() {
   try {
-    await loadMeta();
+    mapMeta = computeMeta(world.bounds);
     const res = await fetch("/api/world", { cache: "no-store" });
     world = await res.json();
     if (!Object.keys(world.bounds).length) {
