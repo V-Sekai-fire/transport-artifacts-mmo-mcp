@@ -825,7 +825,6 @@ window.addEventListener("resize", () => { view.initialised = false; renderMap();
 
 async function poll() {
   try {
-    mapMeta = computeMeta(world.bounds);
     const res = await fetch("/api/world", { cache: "no-store" });
     world = await res.json();
     if (!Object.keys(world.bounds).length) {
@@ -833,6 +832,7 @@ async function poll() {
       return;
     }
     if (!world.bounds[activeLayer]) activeLayer = Object.keys(world.bounds)[0];
+    mapMeta = computeMeta(world.bounds);
     const shown = mapMeta && mapMeta[activeLayer] ? visibleTiles(mapMeta[activeLayer]).length : 0;
     document.getElementById("status").textContent =
       `${shown} / ${world.tiles.length} tiles · ${world.characters.length} live · ${new Date(world.fetched_at).toLocaleTimeString()}`;
