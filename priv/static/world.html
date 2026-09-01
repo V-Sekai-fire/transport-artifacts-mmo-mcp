@@ -558,7 +558,7 @@ function renderMap() {
       const scale = (m.tile_size - inset * 2 - iconInset * 2) / 16;
       const tx = px + inset + iconInset;
       const ty = py + inset + iconInset;
-      parts.push(`<g transform="translate(${tx} ${ty}) scale(${scale})" stroke="${c.border}" style="color:${c.border}"><use href="#i-${c.icon}"/></g>`);
+      parts.push(`<g transform="translate(${tx} ${ty}) scale(${scale})" stroke="${c.border}" style="color:${c.border}"><use href="#i-${c.icon}" width="16" height="16"/></g>`);
     } else if (c.word) {
       const short = String(c.word).slice(0, 6);
       parts.push(`<text class="word-text" x="${px + m.tile_size / 2}" y="${py + m.tile_size / 2 + 1}" fill="${c.border}">${short}</text>`);
