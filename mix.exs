@@ -13,6 +13,7 @@ defmodule ArtifactsMMOMCP.MixProject do
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
+      releases: [artifacts_mmo_mcp: [include_executables_for: [:unix]]],
       description:
         "MCP server that plays ArtifactsMMO and records paired planner/API traces for taskweft",
       source_url: "https://github.com/weftspun/artifacts-mmo-mcp"
