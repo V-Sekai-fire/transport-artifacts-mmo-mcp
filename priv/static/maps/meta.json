@@ -1,0 +1,32 @@
+{
+  "overworld": {
+    "layer": "overworld",
+    "min_x": -5,
+    "min_y": -5,
+    "max_x": 11,
+    "max_y": 22,
+    "tile_size": 16,
+    "width": 272,
+    "height": 448
+  },
+  "underground": {
+    "layer": "underground",
+    "min_x": -5,
+    "min_y": -5,
+    "max_x": 11,
+    "max_y": 22,
+    "tile_size": 16,
+    "width": 272,
+    "height": 448
+  },
+  "interior": {
+    "layer": "interior",
+    "min_x": -5,
+    "min_y": -5,
+    "max_x": 11,
+    "max_y": 22,
+    "tile_size": 16,
+    "width": 272,
+    "height": 448
+  }
+}

@@ -41,10 +41,18 @@ defmodule ArtifactsMMOMCP.Watch do
     end
   end
 
+  @doc "Everything this server asked characters to do lately, newest first."
+  def recent_actions do
+    case GenServer.whereis(@name) do
+      nil -> []
+      pid -> GenServer.call(pid, :recent)
+    end
+  end
+
   @impl true
   def init(_opts) do
     send(self(), :poll)
-    {:ok, %{characters: [], fetched_at: nil, error: nil, actions: %{}}}
+    {:ok, %{characters: [], fetched_at: nil, error: nil, actions: %{}, feed: []}}
   end
 
   @impl true
@@ -54,10 +62,13 @@ defmodule ArtifactsMMOMCP.Watch do
     {:reply, reply, state}
   end
 
+  def handle_call(:recent, _from, state), do: {:reply, state.feed, state}
+
   @impl true
   def handle_cast({:action, character, action, status}, state) do
     entry = %{action: action, status: status, at: DateTime.utc_now() |> DateTime.to_iso8601()}
-    {:noreply, put_in(state.actions[character], entry)}
+    row = Map.put(entry, :character, character)
+    {:noreply, %{state | actions: Map.put(state.actions, character, entry), feed: Enum.take([row | state.feed], 40)}}
   end
 
   @impl true

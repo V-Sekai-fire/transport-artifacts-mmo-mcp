@@ -8,6 +8,6 @@ defmodule ArtifactsMMOMCP.WorldTest do
     conn = Plug.Test.conn(:get, "/world")
     conn = ArtifactsMMOMCP.Router.call(conn, ArtifactsMMOMCP.Router.init([]))
     assert conn.status == 200
-    assert String.contains?(conn.resp_body, "World Map")
+    assert String.contains?(conn.resp_body, "World · Live")
   end
 end

@@ -22,15 +22,18 @@ defmodule ArtifactsMMOMCP.World do
 
   def start_link(opts), do: GenServer.start_link(@name, opts, name: @name)
 
-  @doc "The whole world plus the current character snapshot."
+  @doc "The whole world plus the current character snapshot and action feed."
   def snapshot do
     case GenServer.whereis(@name) do
       nil ->
-        %{tiles: [], bounds: %{}, fetched_at: nil, error: "world not running", characters: []}
+        %{tiles: [], bounds: %{}, fetched_at: nil, error: "world not running",
+          characters: [], feed: []}
 
       pid ->
         base = GenServer.call(pid, :snapshot)
-        Map.put(base, :characters, Watch.snapshot().characters)
+        base
+        |> Map.put(:characters, Watch.snapshot().characters)
+        |> Map.put(:feed, Watch.recent_actions())
     end
   end
 
