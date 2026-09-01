@@ -445,6 +445,34 @@ function hashStr(s) {
   return h;
 }
 
+// View window: a fixed rectangle of plots around the focus, MMO-style. Not
+// viewport culling — this is what the world IS on this screen. Everything
+// outside is unseen.
+const VIEW_W = 5, VIEW_H = 10;
+function viewWindow(f) {
+  const halfW = Math.floor(VIEW_W / 2);
+  const halfH = Math.floor(VIEW_H / 2);
+  return {
+    x0: f.x - halfW,             y0: f.y - halfH,
+    x1: f.x - halfW + VIEW_W - 1, y1: f.y - halfH + VIEW_H - 1,
+  };
+}
+function focusPoint() {
+  const here = (world.characters || []).filter(c => c.layer === activeLayer);
+  if (here.length) return {
+    x: Math.round(here.reduce((a, c) => a + c.x, 0) / here.length),
+    y: Math.round(here.reduce((a, c) => a + c.y, 0) / here.length),
+  };
+  const b = world.bounds[activeLayer];
+  return { x: Math.round((b.min_x + b.max_x) / 2), y: Math.round((b.min_y + b.max_y) / 2) };
+}
+function visibleTiles(_m) {
+  const w = viewWindow(focusPoint());
+  return world.tiles.filter(t =>
+    t.layer === activeLayer &&
+    t.x >= w.x0 && t.x <= w.x1 && t.y >= w.y0 && t.y <= w.y1);
+}
+
 let world = { tiles: [], bounds: {}, characters: [], feed: [] };
 let mapMeta = null;
 let activeLayer = "overworld";
@@ -494,13 +522,19 @@ function renderLayerButtons() {
 }
 
 function initialFit(m) {
-  const pad = 8;  // pixels around the layer in the world's own units
+  // Fit the VIEW_W × VIEW_H window to the stage. Every plot lands at the
+  // same display size regardless of the map's overall dimensions.
   const rect = stage.getBoundingClientRect();
-  const scale = Math.min(rect.width / (m.width + pad * 2), rect.height / (m.height + pad * 2));
+  const scaleX = rect.width  / (VIEW_W * m.tile_size);
+  const scaleY = rect.height / (VIEW_H * m.tile_size);
+  const scale = Math.min(scaleX, scaleY) * 0.96;
+  const f = focusPoint();
+  const cx = (f.x - m.min_x) + 0.5;
+  const cy = (f.y - m.min_y) + 0.5;
   view = {
     scale,
-    tx: (rect.width  - m.width  * scale) / 2,
-    ty: (rect.height - m.height * scale) / 2,
+    tx: rect.width  / 2 - cx * m.tile_size * scale,
+    ty: rect.height / 2 - cy * m.tile_size * scale,
     initialised: true,
   };
 }
@@ -517,7 +551,7 @@ function renderMap() {
   const rect = stage.getBoundingClientRect();
   svg.setAttribute("viewBox", `0 0 ${rect.width} ${rect.height}`);
 
-  const tiles = world.tiles.filter(t => t.layer === activeLayer);
+  const tiles = visibleTiles(m);
   const parts = [];
 
   // Terrain: each plot gets its own bordered rect so the location reads
