@@ -158,7 +158,7 @@
       <span class="now" id="hosted-now">next in 8s</span>
     </div>
     <div id="hosted-body">
-      <div id="hosted-sprite"><img id="hosted-img" alt=""></div>
+      <div id="hosted-sprite"></div>
       <div id="hosted-info">
         <div class="name" id="hosted-name">—</div>
         <div class="sub" id="hosted-sub">—</div>
@@ -430,8 +430,13 @@ function renderHosted() {
   if (!world.characters.length) return;
   const c = world.characters[hostedIndex % world.characters.length];
   const pal = charColor(c.name);
-  document.getElementById("hosted-img").src = pal.sprite;
-  document.getElementById("hosted-sprite").style.borderColor = pal.color;
+  const frame = document.getElementById("hosted-sprite");
+  frame.style.borderColor = pal.color;
+  if (pal.sprite) {
+    frame.innerHTML = `<img src="${pal.sprite}" style="width:80px;height:80px" alt="${c.name}">`;
+  } else {
+    frame.innerHTML = `<div style="width:80px;height:80px;border-radius:50%;background:#fefbf1;border:3px solid ${pal.color};display:grid;place-items:center;color:${pal.color};font:800 16px system-ui">${c.name.replace(/Weft$/, "")}</div>`;
+  }
   document.getElementById("hosted-name").textContent = c.name;
   document.getElementById("hosted-sub").textContent = `lv ${c.level} · ${c.gold}g · ${c.layer || "?"} (${c.x}, ${c.y})`;
 
@@ -466,8 +471,11 @@ function renderChars() {
   document.getElementById("chars").innerHTML = world.characters.map((c, i) => {
     const pal = charColor(c.name);
     const cd = c.cooldown_expiration ? Math.max(0, (new Date(c.cooldown_expiration) - Date.now()) / 1000) : 0;
+    const avatar = pal.sprite
+      ? `<img src="${pal.sprite}">`
+      : `<span style="width:24px;height:24px;border-radius:50%;background:#fefbf1;border:2px solid ${pal.color};color:${pal.color};font:800 9px system-ui;display:grid;place-items:center;flex:0 0 auto">${c.name.slice(0,2).toUpperCase()}</span>`;
     return `<div class="row ${i === hostedIndex % world.characters.length ? "active" : ""}" data-i="${i}">
-      <img src="${pal.sprite}">
+      ${avatar}
       <div class="info">
         <div class="name" style="color:${pal.color}">${c.name}</div>
         <div class="sub">lv ${c.level} · ${c.layer || "?"} (${c.x}, ${c.y}) · ${cd > 0 ? cd.toFixed(1) + "s" : "idle"}</div>
@@ -489,8 +497,9 @@ function renderFeed() {
   document.getElementById("feed").innerHTML = feed.slice(0, 12).map(f => {
     const pal = charColor(f.character);
     const age = Math.round((now - new Date(f.at)) / 1000);
+    const av = pal.sprite ? `<img src="${pal.sprite}">` : `<span style="width:16px;height:16px;border-radius:50%;background:#fefbf1;border:1.5px solid ${pal.color};color:${pal.color};font:800 7px system-ui;display:inline-grid;place-items:center">${f.character.slice(0,2).toUpperCase()}</span>`;
     return `<div class="feed-row">
-      <img src="${pal.sprite}">
+      ${av}
       <span class="fname" style="color:${pal.color}">${f.character}</span>
       <span class="fact">${VERB[f.action] || f.action}</span>
       <span class="fago">${age < 60 ? age + "s" : Math.round(age / 60) + "m"}</span>
