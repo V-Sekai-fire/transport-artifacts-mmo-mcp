@@ -625,9 +625,10 @@ function renderMap() {
 
     // Character stands in the plot but does not fill it — the sprite sits
     // in the bottom-left corner, opposite the content badge.
-    // Only characters within the view distance are drawn.
+    // Only characters within the view window are drawn.
     const _f = focusPoint();
-    if (Math.abs(gx - _f.x) > VIEW_DISTANCE || Math.abs(gy - _f.y) > VIEW_DISTANCE) continue;
+    const _w = viewWindow(_f);
+    if (gx < _w.x0 || gx > _w.x1 || gy < _w.y0 || gy > _w.y1) continue;
     const csize = m.tile_size * 0.55;
     const cx0 = px + 2;
     const cy0 = py + m.tile_size - csize - 2;
