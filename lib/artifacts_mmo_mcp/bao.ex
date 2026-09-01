@@ -69,7 +69,7 @@ defmodule ArtifactsMMOMCP.Bao do
             method: method,
             url: String.trim_trailing(addr, "/") <> path,
             headers: [{"x-vault-token", token}],
-            connect_options: [transport_opts: [:inet6 | tls]],
+            connect_options: [transport_opts: [{:inet6, true} | tls]],
             receive_timeout: 10_000
           ] ++ if(body == nil, do: [], else: [json: body])
 
