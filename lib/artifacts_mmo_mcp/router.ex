@@ -40,9 +40,7 @@ defmodule ArtifactsMMOMCP.Router do
   ]
 
   get "/world" do
-    conn
-    |> put_resp_content_type("text/html")
-    |> send_file(200, Application.app_dir(:artifacts_mmo_mcp, "priv/static/world.html"))
+    conn |> put_resp_header("location", "/") |> send_resp(301, "")
   end
 
   get "/api/world" do
@@ -55,7 +53,7 @@ defmodule ArtifactsMMOMCP.Router do
   get "/" do
     conn
     |> put_resp_content_type("text/html")
-    |> send_file(200, Application.app_dir(:artifacts_mmo_mcp, "priv/static/index.html"))
+    |> send_file(200, Application.app_dir(:artifacts_mmo_mcp, "priv/static/world.html"))
   end
 
   get "/api/characters" do

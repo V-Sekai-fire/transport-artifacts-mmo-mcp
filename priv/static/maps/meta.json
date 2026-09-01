@@ -5,9 +5,9 @@
     "min_y": -5,
     "max_x": 11,
     "max_y": 22,
-    "tile_size": 16,
-    "width": 272,
-    "height": 448
+    "tile_size": 32,
+    "width": 544,
+    "height": 896
   },
   "underground": {
     "layer": "underground",
@@ -15,9 +15,9 @@
     "min_y": -5,
     "max_x": 11,
     "max_y": 22,
-    "tile_size": 16,
-    "width": 272,
-    "height": 448
+    "tile_size": 32,
+    "width": 544,
+    "height": 896
   },
   "interior": {
     "layer": "interior",
@@ -25,8 +25,8 @@
     "min_y": -5,
     "max_x": 11,
     "max_y": 22,
-    "tile_size": 16,
-    "width": 272,
-    "height": 448
+    "tile_size": 32,
+    "width": 544,
+    "height": 896
   }
 }

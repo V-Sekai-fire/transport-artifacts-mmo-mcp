@@ -6,13 +6,13 @@
 <title>World · Live</title>
 <style>
   :root {
-    --bg: #1a1712;
-    --panel: #24201a;
-    --line: #3a3226;
-    --ink: #f4ede0;
-    --dim: #a8967e;
-    --accent: #ff9a3d;
-    --live: #ff3a5e;
+    --bg: #eee4d1;
+    --panel: #fefbf1;
+    --line: #a8967e;
+    --ink: #1c1a17;
+    --dim: #78685a;
+    --accent: #c45a1a;
+    --live: #d63a5e;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); }
@@ -45,15 +45,19 @@
   .layers button.active { background: var(--accent); color: #1a1712; font-weight: 700; }
   .meta { color: var(--dim); margin-left: auto; font-variant-numeric: tabular-nums; font-size: 12px; }
   #stage {
-    flex: 1; background: #0a0806; border: 1px solid var(--line); border-radius: 6px;
+    flex: 1; background: #f8f2e2; border: 1px solid var(--line); border-radius: 6px;
     overflow: hidden; position: relative; cursor: grab;
   }
   #stage.dragging { cursor: grabbing; }
   svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none;
         image-rendering: pixelated; image-rendering: crisp-edges; }
   .tile-hit { fill: transparent; }
-  .content-sprite { image-rendering: pixelated; }
-  .player-sprite { image-rendering: pixelated; }
+  .content-sprite { image-rendering: auto; }
+  .word-text {
+    font: 700 4.5px system-ui, sans-serif; text-anchor: middle;
+    dominant-baseline: central; pointer-events: none;
+  }
+  .player-sprite { image-rendering: auto; }
   .player-name {
     font: 700 4px system-ui, sans-serif; text-anchor: middle;
     fill: #fff; paint-order: stroke;
@@ -64,8 +68,8 @@
     fill: #000;
   }
   #tooltip {
-    position: absolute; pointer-events: none; background: #1a1712; color: var(--ink);
-    border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px;
+    position: absolute; pointer-events: none; background: #1c1a17; color: #f4ede0;
+    border: 1px solid #000; border-radius: 4px; padding: 6px 10px;
     font-size: 12px; max-width: 260px; display: none; z-index: 20;
     box-shadow: 0 6px 16px rgba(0,0,0,.4);
   }
@@ -91,7 +95,7 @@
   #hosted-top .now { color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; }
   #hosted-body { display: grid; grid-template-columns: 96px 1fr; gap: 12px; padding: 4px 12px 12px; }
   #hosted-sprite {
-    width: 96px; height: 96px; background: #0f0d0a; border-radius: 6px;
+    width: 96px; height: 96px; background: #fefbf1; border-radius: 6px;
     display: grid; place-items: center; border: 3px solid var(--accent);
     box-shadow: 0 0 0 2px #0a0806;
   }
@@ -136,7 +140,7 @@
 <body>
 <div id="main">
   <header>
-    <h1>World <a href="/">→ Characters</a></h1>
+    <h1>World · Live</h1>
     <span class="live">LIVE</span>
     <div class="layers" id="layers"></div>
     <span class="meta" id="status">loading…</span>
@@ -179,64 +183,68 @@
 </aside>
 
 <script>
-// Kenney sprite index for content markers. Every content_type in the game data
-// has a mapping; when a new one shows up it falls to a generic ? tile.
-const CONTENT_SPRITE = {
-  monster:        "/static/tiles/dungeon/tile_0109.png",  // goblin
-  resource:       "/static/tiles/town/tile_0004.png",     // green tree (specialised below)
-  npc:            "/static/tiles/town/tile_0092.png",     // hooded figure
-  workshop:       "/static/tiles/town/tile_0128.png",     // hammer (specialised below)
-  bank:           "/static/tiles/dungeon/tile_0089.png",  // closed chest
-  grand_exchange: "/static/tiles/town/tile_0093.png",     // gold coins
-  tasks_master:   "/static/tiles/town/tile_0083.png",     // sign
-  raid:           "/static/tiles/town/tile_0095.png",     // red target
+// Content marker resolver — returns either { sprite } or { word } for a tile.
+// Rule: use a scribble asset when it fits, and a word label otherwise. Never
+// substitute one thing for a different one (a goblin is not a spider).
+// A generated PNG under /static/wan/<content_type>-<code>.png silently
+// overrides the word label the moment it exists, so a wan render can drop in
+// without a code change.
+const SCRIBBLE = (name) => `/static/scribble/${name}.png`;
+
+const CONTENT = (type, code) => {
+  const wanOverride = `/static/wan/${type}-${code}.png`;
+  if (wanExists.has(`${type}-${code}`)) return { sprite: wanOverride };
+
+  if (type === "bank") return { sprite: SCRIBBLE("chest"), border: "#a67a3a" };
+  if (type === "grand_exchange") return { sprite: SCRIBBLE("chest"), border: "#c27ac6", label: "exchange" };
+  if (type === "raid") return { sprite: SCRIBBLE("dragon"), border: "#c62d3d" };
+  if (type === "monster") {
+    if (/dragon/.test(code)) return { sprite: SCRIBBLE("dragon"), border: "#c62d3d" };
+    return { word: code, border: "#c62d3d" };
+  }
+  if (type === "resource") {
+    if (/_tree|_wood/.test(code)) return { sprite: SCRIBBLE("tree"), border: "#3a8a4a" };
+    if (/mushroom|glowstem|nettle|sunflower|plant/.test(code)) return { sprite: SCRIBBLE("plants"), border: "#3a8a4a" };
+    return { word: code.replace(/_/g, " "), border: "#3a8a4a" };
+  }
+  if (type === "workshop") {
+    const w = {
+      mining:         SCRIBBLE("weapon_axe"),
+      woodcutting:    SCRIBBLE("weapon_axe"),
+      weaponcrafting: SCRIBBLE("weapon_sword"),
+      gearcrafting:   SCRIBBLE("weapon_hammer"),
+      alchemy:        SCRIBBLE("weapon_staff"),
+    }[code];
+    return w ? { sprite: w, border: "#7a5a2a" } : { word: code, border: "#7a5a2a" };
+  }
+  if (type === "npc") return { word: code.replace(/_/g, " "), border: "#3a5aa8" };
+  if (type === "tasks_master") return { word: "tasks", border: "#7a4a1a" };
+  return { word: type, border: "#666" };
 };
 
-// Resource / workshop / monster specialisation — the icon that reads best for
-// what the tile actually is.
-const RESOURCE_SPRITE = (code) => {
-  if (/tree|wood/.test(code)) return "/static/tiles/town/tile_0004.png";
-  if (/rocks|ore/.test(code)) return "/static/tiles/dungeon/tile_0024.png";  // rubble
-  if (/spot|fish/.test(code)) return "/static/tiles/dungeon/tile_0113.png";  // silver flask ~ fish
-  if (/mushroom|glowstem|nettle/.test(code)) return "/static/tiles/town/tile_0029.png";
-  if (/sunflower/.test(code)) return "/static/tiles/town/tile_0002.png";
-  if (/palm/.test(code)) return "/static/tiles/town/tile_0009.png";
-  if (/torch_cactus/.test(code)) return "/static/tiles/town/tile_0018.png";
-  return CONTENT_SPRITE.resource;
-};
-const WORKSHOP_SPRITE = (code) => ({
-  mining:          "/static/tiles/town/tile_0115.png",    // pickaxe
-  woodcutting:     "/static/tiles/town/tile_0116.png",    // pitchfork
-  weaponcrafting:  "/static/tiles/town/tile_0128.png",    // small hammer
-  gearcrafting:    "/static/tiles/town/tile_0129.png",    // large hammer
-  jewelrycrafting: "/static/tiles/town/tile_0094.png",    // gold beehive
-  alchemy:         "/static/tiles/dungeon/tile_0113.png", // potion
-  cooking:         "/static/tiles/town/tile_0106.png",    // sack
-}[code] || CONTENT_SPRITE.workshop);
-const MONSTER_SPRITE = (code) => {
-  if (/dragon/.test(code)) return "/static/tiles/dungeon/tile_0110.png";  // scorpion-ish
-  if (/slime/.test(code)) return "/static/tiles/dungeon/tile_0108.png";   // slime
-  if (/skeleton|lich|death_knight/.test(code)) return "/static/tiles/dungeon/tile_0121.png";  // skull
-  if (/spider/.test(code)) return "/static/tiles/dungeon/tile_0120.png";
-  if (/wolf|hellhound/.test(code)) return "/static/tiles/dungeon/tile_0123.png";  // rat
-  if (/orc|ogre|cyclops/.test(code)) return "/static/tiles/dungeon/tile_0100.png"; // barbarian
-  if (/goblin|imp/.test(code)) return "/static/tiles/dungeon/tile_0109.png";      // goblin
-  if (/vampire/.test(code)) return "/static/tiles/dungeon/tile_0111.png";
-  if (/cultist/.test(code)) return "/static/tiles/dungeon/tile_0084.png";  // wizard
-  if (/bat/.test(code)) return "/static/tiles/dungeon/tile_0122.png";
-  if (/pig|cow|chicken|sheep|owlbear|fennec/.test(code)) return "/static/tiles/dungeon/tile_0110.png";
-  if (/mushmush|dryad|cursed_tree/.test(code)) return "/static/tiles/town/tile_0011.png";  // dark tree
-  return "/static/tiles/dungeon/tile_0109.png";
-};
+// Wan-generated sprites, populated at boot from /static/wan/manifest.json.
+// Absent manifest = no overrides, and every fallback stays a word label.
+const wanExists = new Set();
+async function loadWanManifest() {
+  try {
+    const res = await fetch("/static/wan/manifest.json", { cache: "no-cache" });
+    if (!res.ok) return;
+    const list = await res.json();
+    for (const k of list) wanExists.add(k);
+  } catch { /* no wan sprites yet, words stay */ }
+}
 
 // Every character gets a stable color, so a red sprite on the map is always
 // the same person as the red row in the sidebar.
 const PALETTE = [
-  { sprite: "/static/tiles/battle/tile_0160.png", color: "#e0483e" }, // red
-  { sprite: "/static/tiles/battle/tile_0142.png", color: "#3a83d4" }, // blue
-  { sprite: "/static/tiles/battle/tile_0124.png", color: "#4aa960" }, // green
-  { sprite: "/static/tiles/battle/tile_0178.png", color: "#e08c2a" }, // orange
-  { sprite: "/static/tiles/battle/tile_0106.png", color: "#8a8a8a" }, // gray
+  { sprite: "/static/scribble/red_character.png",    color: "#e0483e" },
+  { sprite: "/static/scribble/green_character.png",  color: "#4aa960" },
+  { sprite: "/static/scribble/purple_character.png", color: "#8a5ec6" },
+  { sprite: "/static/scribble/yellow_character.png", color: "#e0b83e" },
+  // Scribble Dungeons ships only four colored characters. The fifth character
+  // gets a name-badge in its own color — the "words when tiles are missing"
+  // rule applied to the character sprites too.
+  { sprite: null, color: "#3a83d4" },
 ];
 
 let world = { tiles: [], bounds: {}, characters: [], feed: [] };
@@ -311,16 +319,21 @@ function renderMap() {
   // Background image: the composited terrain PNG.
   parts.push(`<image href="/static/maps/${activeLayer}.png" x="0" y="0" width="${m.width}" height="${m.height}" style="image-rendering:pixelated"/>`);
 
-  // Content overlays — a small sprite per tile with a content_type.
+  // Content overlays — either a scribble sprite or a word label per tile.
   for (const t of tiles) {
     if (!t.content_type) continue;
     const { px, py } = tilePx(t, m);
-    const sprite =
-      t.content_type === "resource" ? RESOURCE_SPRITE(t.content_code || "") :
-      t.content_type === "workshop" ? WORKSHOP_SPRITE(t.content_code || "") :
-      t.content_type === "monster"  ? MONSTER_SPRITE(t.content_code || "") :
-      CONTENT_SPRITE[t.content_type] || CONTENT_SPRITE.monster;
-    parts.push(`<image class="content-sprite" href="${sprite}" x="${px}" y="${py}" width="${m.tile_size}" height="${m.tile_size}"/>`);
+    const c = CONTENT(t.content_type, t.content_code || "");
+    if (c.sprite) {
+      const inset = 1;
+      parts.push(`<rect class="content-frame" x="${px + inset}" y="${py + inset}" width="${m.tile_size - inset * 2}" height="${m.tile_size - inset * 2}" fill="#fefbf1" stroke="${c.border || "#333"}" stroke-width="0.4" rx="2"/>`);
+      parts.push(`<image class="content-sprite" href="${c.sprite}" x="${px + inset}" y="${py + inset}" width="${m.tile_size - inset * 2}" height="${m.tile_size - inset * 2}"/>`);
+    } else if (c.word) {
+      const text = String(c.word).slice(0, 10);
+      const short = text.length > 6 ? text.slice(0, 6) : text;
+      parts.push(`<rect class="word-badge" x="${px + 1}" y="${py + 1}" width="${m.tile_size - 2}" height="${m.tile_size - 2}" fill="#fefbf1" stroke="${c.border || "#333"}" stroke-width="0.5" rx="2"/>`);
+      parts.push(`<text class="word-text" x="${px + m.tile_size / 2}" y="${py + m.tile_size / 2 + 1}" fill="${c.border || "#333"}">${short}</text>`);
+    }
   }
 
   // Transition arrows for uncontented tiles that have a layer link.
@@ -347,14 +360,24 @@ function renderMap() {
     if (group.length === 1) {
       const c = group[0];
       const pal = charColor(c.name);
-      parts.push(`<image class="player-sprite" href="${pal.sprite}" x="${px}" y="${py}" width="${m.tile_size}" height="${m.tile_size}"/>`);
+      if (pal.sprite) {
+        parts.push(`<image class="player-sprite" href="${pal.sprite}" x="${px}" y="${py}" width="${m.tile_size}" height="${m.tile_size}"/>`);
+      } else {
+        // Fifth character: word-badge in the character's color.
+        parts.push(`<circle cx="${px + m.tile_size / 2}" cy="${py + m.tile_size / 2}" r="${m.tile_size / 2 - 1}" fill="#fefbf1" stroke="${pal.color}" stroke-width="1.2"/>`);
+        parts.push(`<text class="cluster-badge" x="${px + m.tile_size / 2}" y="${py + m.tile_size / 2 + 1}" fill="${pal.color}" style="font-size:5.5px">${c.name.replace(/Weft$/, "")}</text>`);
+      }
       parts.push(`<text class="player-name" x="${px + m.tile_size / 2}" y="${py - 1}">${c.name}</text>`);
     } else {
       // Cluster: a stack of sprites with a count badge.
       group.slice(0, 3).forEach((c, i) => {
         const pal = charColor(c.name);
         const off = i * 2;
-        parts.push(`<image class="player-sprite" href="${pal.sprite}" x="${px - off}" y="${py - off}" width="${m.tile_size}" height="${m.tile_size}"/>`);
+        if (pal.sprite) {
+          parts.push(`<image class="player-sprite" href="${pal.sprite}" x="${px - off}" y="${py - off}" width="${m.tile_size}" height="${m.tile_size}"/>`);
+        } else {
+          parts.push(`<circle cx="${px - off + m.tile_size / 2}" cy="${py - off + m.tile_size / 2}" r="${m.tile_size / 2 - 1}" fill="#fefbf1" stroke="${pal.color}" stroke-width="1"/>`);
+        }
       });
       const badgeX = px + m.tile_size - 2;
       const badgeY = py - 2;
@@ -537,7 +560,7 @@ setInterval(() => {
   renderHosted();
 }, 1000);
 
-poll();
+loadWanManifest().then(poll);
 setInterval(poll, 2000);
 </script>
 </body>
