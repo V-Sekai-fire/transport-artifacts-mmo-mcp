@@ -24,6 +24,40 @@ answers 503, which is the intended state for a public hostname — but a
 deploy that forgets it is a server that cannot plan, so set it first and
 put the value in bao beside the game token.
 
+## The app's own bao identity
+
+`artifacts-mmo-mcp` has a client certificate of its own — CN
+`artifacts-mmo-mcp.internal`, issued from `pki/issue/service` — and a token
+carrying only the `artifacts-mmo-mcp` policy:
+
+    path "secret/data/artifacts-mmo/*"     read
+    path "secret/metadata/artifacts-mmo/*" read, list
+    path "pki/issue/service"               create, update
+    path "auth/token/renew-self"           update
+    path "sys/health"                      read
+
+**Negative controls, all three verified against the live listener**: a write to
+its own secret returns 403, a read of `secret/data/fdb/root` returns 403, and an
+issue under `pki/issue/fdb-server` returns 403.
+
+`ArtifactsMMOMCP.Renew` checks hourly: it renews the token daily and re-issues
+the certificate once fewer than ten days remain. `pki/roles/service` caps a
+certificate at 30 days, so ten days of margin is 240 chances to succeed.
+
+**What renewal cannot fix.** Reaching bao needs a valid certificate, so a
+machine that was down past the expiry cannot re-issue its way back. That case
+falls back to the Fly secrets, which still carry the game token, and
+`GET /health` reports `bao.configured: false`. Re-issue by hand:
+
+```sh
+flyctl ssh console -a spot-broker -C "sh -c \"curl -s --cert /app/bao-tls/client-cert.pem \
+  --key /app/bao-tls/client-key.pem --cacert /app/bao-tls/ca-chain.pem \
+  -H 'X-Vault-Token: <root>' -X POST -d '{\\\"common_name\\\":\\\"artifacts-mmo-mcp.internal\\\",\\\"ttl\\\":\\\"720h\\\"}' \
+  https://weftspun-bao.internal:8200/v1/pki/issue/service\""
+```
+
+Then set `BAO_CLIENT_CERT_B64` and `BAO_CLIENT_KEY_B64` from the result.
+
 ## Volume and app
 
 ```sh
@@ -58,3 +92,5 @@ flyctl certs check watch.chibifire.com -a artifacts-mmo-mcp
 - `curl -s -o /dev/null -w '%{http_code}' -X POST https://watch.chibifire.com/mcp`
   returns 401. **This is the negative control**: a 200 here means the account is
   open to the internet, and the deploy is wrong.
+- `/health` reports `bao.configured: true` with `cert_days_left` above ten. A
+  falling number that never resets means renewal is not running.

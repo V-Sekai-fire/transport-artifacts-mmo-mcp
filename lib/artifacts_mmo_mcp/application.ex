@@ -10,7 +10,8 @@ defmodule ArtifactsMMOMCP.Application do
 
     * `PORT` — listen port, default `5243`.
     * `ARTIFACTS_MMO_API_URL` — game API, default `https://api.artifactsmmo.com`.
-    * `ARTIFACTS_MMO_TOKEN` — account token, from OpenBao `secret/artifacts-mmo/api`.
+    * `ARTIFACTS_MMO_TOKEN` — account token; `ArtifactsMMOMCP.Bao` overwrites it
+      at boot when bao is reachable, so bao is the record and this is a fallback.
     * `ARTIFACTS_MMO_CHARACTER` — character used when a tool call omits one.
     * `TRACE_DIR` — where the two trace layers are written, default `traces`.
 
@@ -22,6 +23,7 @@ defmodule ArtifactsMMOMCP.Application do
 
   @impl true
   def start(_type, _args) do
+    ArtifactsMMOMCP.Bao.load()
     port = String.to_integer(System.get_env("PORT", "5243"))
 
     if ArtifactsMMOMCP.Client.token() == "" do
@@ -32,6 +34,7 @@ defmodule ArtifactsMMOMCP.Application do
 
     children = [
       {ArtifactsMMOMCP.Trace, []},
+      {ArtifactsMMOMCP.Renew, []},
       {ArtifactsMMOMCP.Watch, []},
       {Plug.Cowboy,
        scheme: :http, plug: ArtifactsMMOMCP.Router, options: [port: port, ip: {0, 0, 0, 0}]}

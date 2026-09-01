@@ -56,7 +56,8 @@ defmodule ArtifactsMMOMCP.Router do
     body = %{
       "status" => "ok",
       "version" => @version,
-      "token_present" => ArtifactsMMOMCP.Client.token() != ""
+      "token_present" => ArtifactsMMOMCP.Client.token() != "",
+      "bao" => ArtifactsMMOMCP.Renew.status()
     }
 
     conn
