@@ -520,14 +520,15 @@ function renderMap() {
   const tiles = world.tiles.filter(t => t.layer === activeLayer);
   const parts = [];
 
-  // Terrain as inline SVG rects — vector, scales cleanly at any zoom.
+  // Terrain: each plot gets its own bordered rect so the location reads
+  // as a place, not a pixel of color.
   const empty = EMPTY_FILL[activeLayer];
   for (const t of tiles) {
     const { px, py } = tilePx(t, m);
     const fill = TERRAIN_FILL[t.name];
     const color = fill === null ? empty : (fill || empty);
     if (color) {
-      parts.push(`<rect x="${px}" y="${py}" width="${m.tile_size}" height="${m.tile_size}" fill="${color}"/>`);
+      parts.push(`<rect x="${px}" y="${py}" width="${m.tile_size}" height="${m.tile_size}" fill="${color}" stroke="rgba(0,0,0,.14)" stroke-width="0.35"/>`);
     }
   }
 
@@ -549,19 +550,21 @@ function renderMap() {
     if (!t.content_type) continue;
     const { px, py } = tilePx(t, m);
     const c = iconFor(t.content_type, t.content_code || "");
-    const inset = 1.5;
-    parts.push(`<rect x="${px + inset}" y="${py + inset}" width="${m.tile_size - inset * 2}" height="${m.tile_size - inset * 2}" fill="#fefbf1" stroke="${c.border}" stroke-width="0.6" rx="2"/>`);
+    // A content marker is a badge in the plot, not the plot itself, so a
+    // character standing on the same plot is still visible beside it.
+    const size = m.tile_size * 0.62;
+    const bx = px + m.tile_size - size - 2;
+    const by = py + 2;
+    parts.push(`<rect x="${bx}" y="${by}" width="${size}" height="${size}" fill="#fefbf1" stroke="${c.border}" stroke-width="0.7" rx="${size * 0.15}"/>`);
     if (c.sprite) {
-      parts.push(`<image href="${c.sprite}" x="${px + inset + 1}" y="${py + inset + 1}" width="${m.tile_size - inset * 2 - 2}" height="${m.tile_size - inset * 2 - 2}"/>`);
+      parts.push(`<image href="${c.sprite}" x="${bx + 1}" y="${by + 1}" width="${size - 2}" height="${size - 2}"/>`);
     } else if (c.icon) {
-      const iconInset = 2;
-      const scale = (m.tile_size - inset * 2 - iconInset * 2) / 16;
-      const tx = px + inset + iconInset;
-      const ty = py + inset + iconInset;
-      parts.push(`<g transform="translate(${tx} ${ty}) scale(${scale})" stroke="${c.border}" style="color:${c.border}"><use href="#i-${c.icon}" width="16" height="16"/></g>`);
+      const iconInset = size * 0.10;
+      const iconScale = (size - iconInset * 2) / 16;
+      parts.push(`<g transform="translate(${bx + iconInset} ${by + iconInset}) scale(${iconScale})" stroke="${c.border}" style="color:${c.border}"><use href="#i-${c.icon}" width="16" height="16"/></g>`);
     } else if (c.word) {
-      const short = String(c.word).slice(0, 6);
-      parts.push(`<text class="word-text" x="${px + m.tile_size / 2}" y="${py + m.tile_size / 2 + 1}" fill="${c.border}">${short}</text>`);
+      const short = String(c.word).slice(0, 5);
+      parts.push(`<text class="word-text" x="${bx + size / 2}" y="${by + size / 2 + 1}" fill="${c.border}" style="font-size:${size * 0.28}px">${short}</text>`);
     }
   }
 
@@ -586,32 +589,35 @@ function renderMap() {
     const px = (gx - m.min_x) * m.tile_size;
     const py = (gy - m.min_y) * m.tile_size;
 
+    // Character stands in the plot but does not fill it — the sprite sits
+    // in the bottom-left corner, opposite the content badge.
+    const csize = m.tile_size * 0.55;
+    const cx0 = px + 2;
+    const cy0 = py + m.tile_size - csize - 2;
     if (group.length === 1) {
       const c = group[0];
       const pal = charColor(c.name);
       if (pal.sprite) {
-        parts.push(`<image class="player-sprite" href="${pal.sprite}" x="${px}" y="${py}" width="${m.tile_size}" height="${m.tile_size}"/>`);
+        parts.push(`<image class="player-sprite" href="${pal.sprite}" x="${cx0}" y="${cy0}" width="${csize}" height="${csize}"/>`);
       } else {
-        // Fifth character: word-badge in the character's color.
-        parts.push(`<circle cx="${px + m.tile_size / 2}" cy="${py + m.tile_size / 2}" r="${m.tile_size / 2 - 1}" fill="#fefbf1" stroke="${pal.color}" stroke-width="1.2"/>`);
-        parts.push(`<text class="cluster-badge" x="${px + m.tile_size / 2}" y="${py + m.tile_size / 2 + 1}" fill="${pal.color}" style="font-size:5.5px">${c.name.replace(/Weft$/, "")}</text>`);
+        parts.push(`<circle cx="${cx0 + csize / 2}" cy="${cy0 + csize / 2}" r="${csize / 2 - 0.5}" fill="#fefbf1" stroke="${pal.color}" stroke-width="1.2"/>`);
+        parts.push(`<text class="cluster-badge" x="${cx0 + csize / 2}" y="${cy0 + csize / 2 + 1}" fill="${pal.color}" style="font-size:${csize * 0.28}px">${c.name.replace(/Weft$/, "")}</text>`);
       }
       parts.push(`<text class="player-name" x="${px + m.tile_size / 2}" y="${py - 1}">${c.name}</text>`);
     } else {
-      // Cluster: a stack of sprites with a count badge.
       group.slice(0, 3).forEach((c, i) => {
         const pal = charColor(c.name);
-        const off = i * 2;
+        const off = i * 1.5;
         if (pal.sprite) {
-          parts.push(`<image class="player-sprite" href="${pal.sprite}" x="${px - off}" y="${py - off}" width="${m.tile_size}" height="${m.tile_size}"/>`);
+          parts.push(`<image class="player-sprite" href="${pal.sprite}" x="${cx0 + off}" y="${cy0 - off}" width="${csize}" height="${csize}"/>`);
         } else {
-          parts.push(`<circle cx="${px - off + m.tile_size / 2}" cy="${py - off + m.tile_size / 2}" r="${m.tile_size / 2 - 1}" fill="#fefbf1" stroke="${pal.color}" stroke-width="1"/>`);
+          parts.push(`<circle cx="${cx0 + off + csize / 2}" cy="${cy0 - off + csize / 2}" r="${csize / 2 - 0.5}" fill="#fefbf1" stroke="${pal.color}" stroke-width="1"/>`);
         }
       });
-      const badgeX = px + m.tile_size - 2;
-      const badgeY = py - 2;
-      parts.push(`<circle cx="${badgeX}" cy="${badgeY}" r="4" fill="var(--accent)" stroke="#000" stroke-width="0.6"/>`);
-      parts.push(`<text class="cluster-badge" x="${badgeX}" y="${badgeY + 0.3}">${group.length}</text>`);
+      const badgeX = cx0 + csize;
+      const badgeY = cy0 + csize;
+      parts.push(`<circle cx="${badgeX}" cy="${badgeY}" r="${csize * 0.28}" fill="var(--accent)" stroke="#000" stroke-width="0.5"/>`);
+      parts.push(`<text class="cluster-badge" x="${badgeX}" y="${badgeY + 0.5}" style="font-size:${csize * 0.35}px">${group.length}</text>`);
     }
   }
 
