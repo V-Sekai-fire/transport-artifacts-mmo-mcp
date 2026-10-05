@@ -3,7 +3,7 @@
 
 # transport-artifacts-mmo-mcp
 
-A Model Context Protocol server that plays an online role-playing game through its HTTP API and records paired planner and game traces for taskweft.
+A Model Context Protocol server that plays an online role-playing game over its HTTP API and records planner and game traces for taskweft.
 
 ## What it is for
 
