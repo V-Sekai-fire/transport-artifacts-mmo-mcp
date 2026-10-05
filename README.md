@@ -16,7 +16,7 @@ mix deps.get
 mix run --no-halt
 ```
 
-`.env.example` names the settings it reads, and `DEPLOY.md` covers the hosted deployment.
+`.env.example` names the settings it reads. A local run sets `MCP_AUTH_TOKEN` or `MCP_OPEN=1`, or `/mcp` answers 503. `DEPLOY.md` covers the hosted deployment.
 
 ## Licence
 
